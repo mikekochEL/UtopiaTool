@@ -89,6 +89,7 @@
       border-radius: 12px;
       padding: 12px;
       box-shadow: 0 8px 24px rgba(2, 6, 14, 0.25);
+      cursor: pointer;
     }
 
     .kpi .label {
@@ -171,6 +172,20 @@
       font-size: 12px;
       text-transform: uppercase;
       letter-spacing: 0.6px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    th.sorted-asc::after {
+      content: " ▲";
+      color: var(--accent);
+      font-size: 10px;
+    }
+
+    th.sorted-desc::after {
+      content: " ▼";
+      color: var(--accent);
+      font-size: 10px;
     }
 
     td.summary {
@@ -311,6 +326,47 @@
       line-height: 1.5;
     }
 
+    .inline-link {
+      background: transparent;
+      border: 0;
+      color: var(--accent);
+      padding: 0;
+      font: inherit;
+      cursor: pointer;
+      text-decoration: underline;
+      text-decoration-style: dotted;
+    }
+
+    .inline-link:hover {
+      color: #84c9ff;
+    }
+
+    .fact-rows div {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      border-bottom: 1px solid rgba(159, 186, 223, 0.15);
+      padding: 6px 0;
+      font-size: 13px;
+    }
+
+    .fact-events {
+      margin-top: 8px;
+      max-height: 260px;
+      overflow-y: auto;
+      display: grid;
+      gap: 6px;
+    }
+
+    .fact-events .event {
+      font-size: 12px;
+      color: #d7e6fb;
+      border: 1px solid rgba(159, 186, 223, 0.2);
+      border-radius: 8px;
+      padding: 7px 8px;
+      background: rgba(20, 41, 67, 0.45);
+    }
+
     @media (max-width: 1220px) {
       .charts {
         grid-template-columns: 1fr;
@@ -369,41 +425,41 @@
     </section>
 
     <section class="kpis">
-      <div class="kpi">
+      <div class="kpi" data-fact="total_events">
         <div class="label">Total Events</div>
         <div class="value">{{ analytics["kpis"]["total_events"] }}</div>
       </div>
-      <div class="kpi">
+      <div class="kpi" data-fact="attack_success">
         <div class="label">Attack Success</div>
         <div class="value">{{ analytics["kpis"]["attack_success_rate"] }}%</div>
         <div class="sub">{{ analytics["kpis"]["successful_hits"] }} successful / {{ analytics["kpis"]["failed_hits"] }} failed</div>
       </div>
-      <div class="kpi">
+      <div class="kpi" data-fact="home_net">
         <div class="label">Home Acres Gained</div>
         <div class="value gain">{{ analytics["kpis"]["home_gained"] }}</div>
       </div>
-      <div class="kpi">
+      <div class="kpi" data-fact="home_net">
         <div class="label">Home Acres Lost</div>
         <div class="value loss">{{ analytics["kpis"]["home_lost"] }}</div>
       </div>
-      <div class="kpi">
+      <div class="kpi" data-fact="home_net">
         <div class="label">Home Net Acres</div>
         <div class="value {{ 'gain' if analytics['kpis']['home_net'] >= 0 else 'loss' }}">{{ analytics["kpis"]["home_net"] }}</div>
       </div>
-      <div class="kpi">
+      <div class="kpi" data-fact="total_events">
         <div class="label">Tracked Provinces</div>
         <div class="value">{{ analytics["kpis"]["tracked_provinces"] }}</div>
         <div class="sub">{{ analytics["kpis"]["tracked_kingdoms"] }} kingdoms</div>
       </div>
-      <div class="kpi">
+      <div class="kpi" data-fact="aid_shipments">
         <div class="label">Aid Shipments</div>
         <div class="value">{{ analytics["kpis"]["aid_shipments"] }}</div>
       </div>
-      <div class="kpi">
+      <div class="kpi" data-fact="total_events">
         <div class="label">Dragons / Diplomacy</div>
         <div class="value">{{ analytics["kpis"]["dragons"] }} / {{ analytics["kpis"]["diplomacy"] }}</div>
       </div>
-      <div class="kpi">
+      <div class="kpi" data-fact="wars">
         <div class="label">Wars</div>
         <div class="value">{{ analytics["kpis"]["active_wars"] }} active / {{ analytics["kpis"]["completed_wars"] }} closed</div>
         <div class="sub">victories {{ analytics["kpis"]["war_victories"] }} | failures {{ analytics["kpis"]["war_failures"] }}</div>
@@ -414,7 +470,7 @@
       <h3>War Results</h3>
       <p class="hint">Declaration-to-end war tracking with post-war windows and land/hit outcomes versus your inferred home kingdom.</p>
       <div class="table-wrap">
-        <table>
+        <table class="sortable">
           <tr>
             <th>Opponent</th>
             <th>Opp KD</th>
@@ -430,7 +486,7 @@
             <th>Post-War Ended</th>
           </tr>
           {% for row in analytics["war_rows"] %}
-            <tr>
+            <tr class="fact-row" data-fact="war" data-key="{{ row['war_id'] }}">
               <td>{{ row["opponent_name"] }}</td>
               <td>{{ row["opponent_kingdom"] or "-" }}</td>
               <td>{{ row["start_day"] or "-" }}</td>
@@ -459,7 +515,7 @@
         <h3>Friendly Province Ledger</h3>
         <p class="hint">Top friendly provinces by net acres (gains - losses).</p>
         <div class="table-wrap">
-          <table>
+          <table class="sortable">
             <tr>
               <th>Province</th>
               <th>KD</th>
@@ -472,7 +528,14 @@
             </tr>
             {% for row in analytics["friendly_leaderboard"] %}
               <tr>
-                <td>{{ row["name"] }}</td>
+                <td>
+                  <button
+                    type="button"
+                    class="inline-link province-link"
+                    data-province="{{ row['name'] }}"
+                    data-kingdom="{{ row['kingdom'] or '' }}"
+                  >{{ row["name"] }}</button>
+                </td>
                 <td>{{ row["kingdom"] or "-" }}</td>
                 <td>{{ row["gains"] }}</td>
                 <td>{{ row["losses"] }}</td>
@@ -490,7 +553,7 @@
         <h3>Opponent Kingdom Pressure</h3>
         <p class="hint">How each opponent kingdom traded land and hits versus home kingdom {{ analytics["home_kingdom"] or "?" }}.</p>
         <div class="table-wrap">
-          <table>
+          <table class="sortable">
             <tr>
               <th>Opponent KD</th>
               <th>Hits For</th>
@@ -500,7 +563,7 @@
               <th>Net</th>
             </tr>
             {% for row in analytics["opponent_rows"] %}
-              <tr>
+              <tr class="fact-row" data-fact="opponent" data-key="{{ row['kingdom'] }}">
                 <td>{{ row["kingdom"] }}</td>
                 <td>{{ row["hits_for"] }}</td>
                 <td>{{ row["hits_against"] }}</td>
@@ -519,7 +582,7 @@
         <h3>Most Active Provinces</h3>
         <p class="hint">Activity = attacks sent + attacks received + aid sent + aid received.</p>
         <div class="table-wrap">
-          <table>
+          <table class="sortable">
             <tr>
               <th>Province</th>
               <th>KD</th>
@@ -531,7 +594,14 @@
             </tr>
             {% for row in analytics["active_rows"] %}
               <tr>
-                <td>{{ row["name"] }}</td>
+                <td>
+                  <button
+                    type="button"
+                    class="inline-link province-link"
+                    data-province="{{ row['name'] }}"
+                    data-kingdom="{{ row['kingdom'] or '' }}"
+                  >{{ row["name"] }}</button>
+                </td>
                 <td>{{ row["kingdom"] or "-" }}</td>
                 <td>{{ row["activity"] }}</td>
                 <td>{{ row["attacks_sent"] }}</td>
@@ -548,7 +618,7 @@
         <h3>Most Targeted Provinces</h3>
         <p class="hint">Provinces absorbing the highest incoming pressure.</p>
         <div class="table-wrap">
-          <table>
+          <table class="sortable">
             <tr>
               <th>Province</th>
               <th>KD</th>
@@ -558,7 +628,14 @@
             </tr>
             {% for row in analytics["target_rows"] %}
               <tr>
-                <td>{{ row["name"] }}</td>
+                <td>
+                  <button
+                    type="button"
+                    class="inline-link province-link"
+                    data-province="{{ row['name'] }}"
+                    data-kingdom="{{ row['kingdom'] or '' }}"
+                  >{{ row["name"] }}</button>
+                </td>
                 <td>{{ row["kingdom"] or "-" }}</td>
                 <td>{{ row["attacks_received"] }}</td>
                 <td>{{ row["losses"] }}</td>
@@ -591,7 +668,7 @@
       <h3>Latest Event Feed</h3>
       <p class="hint">Most recent 80 parsed events with derived outcome and acre deltas.</p>
       <div class="table-wrap">
-        <table>
+        <table class="sortable">
           <tr>
             <th>Fetched</th>
             <th>Event Day</th>
@@ -612,7 +689,9 @@
               data-outcome="{{ row['outcome'] or '-' }}"
               data-acres="{{ row['acres'] if row['acres'] is not none else '-' }}"
               data-actor="{{ row['actor'] }}"
+              data-actor-kingdom="{{ row['actor_kingdom'] or '' }}"
               data-target="{{ row['target'] }}"
+              data-target-kingdom="{{ row['target_kingdom'] or '' }}"
               data-summary="{{ row['summary']|e }}"
             >
               <td>{{ row["fetched_at_utc"] }}</td>
@@ -626,8 +705,30 @@
                 {% endif %}
               </td>
               <td>{{ row["acres"] if row["acres"] is not none else "-" }}</td>
-              <td>{{ row["actor"] }}</td>
-              <td>{{ row["target"] }}</td>
+              <td>
+                {% if row["actor"] != "-" %}
+                  <button
+                    type="button"
+                    class="inline-link province-link"
+                    data-province="{{ row['actor'] }}"
+                    data-kingdom="{{ row['actor_kingdom'] or '' }}"
+                  >{{ row["actor"] }}</button>
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+              <td>
+                {% if row["target"] != "-" %}
+                  <button
+                    type="button"
+                    class="inline-link province-link"
+                    data-province="{{ row['target'] }}"
+                    data-kingdom="{{ row['target_kingdom'] or '' }}"
+                  >{{ row["target"] }}</button>
+                {% else %}
+                  -
+                {% endif %}
+              </td>
               <td class="summary">{{ row["summary"] }}</td>
             </tr>
           {% endfor %}
@@ -640,6 +741,35 @@
       <p id="eventDetailHint" class="hint">Click any row in Latest Event Feed to inspect details.</p>
       <div id="eventDetailMeta" class="detail-grid"></div>
       <p id="eventDetailSummary" class="detail-summary">No event selected.</p>
+    </section>
+
+    <section id="provinceHistory" class="card" style="margin-top: 12px;">
+      <h3 id="provinceHistoryTitle">Province History</h3>
+      <p id="provinceHistoryHint" class="hint">Click a province name anywhere in the tables to load its timeline.</p>
+      <div id="provinceHistoryMeta" class="fact-rows"></div>
+      <div class="table-wrap" style="margin-top: 8px;">
+        <table id="provinceHistoryTable" class="sortable">
+          <tr>
+            <th>Fetched</th>
+            <th>Day</th>
+            <th>Category</th>
+            <th>Role</th>
+            <th>Outcome</th>
+            <th>Acres</th>
+            <th>Actor</th>
+            <th>Target</th>
+            <th>Summary</th>
+          </tr>
+        </table>
+      </div>
+    </section>
+
+    <section id="factDetail" class="card" style="margin-top: 12px;">
+      <h3 id="factDetailTitle">Fact Detail</h3>
+      <p id="factDetailHint" class="hint">Click KPI cards, war rows, or opponent rows to inspect supporting detail.</p>
+      <p id="factDetailSummary" class="detail-summary">No fact selected.</p>
+      <div id="factDetailRows" class="fact-rows"></div>
+      <div id="factDetailEvents" class="fact-events"></div>
     </section>
 
     <p class="footer-note">

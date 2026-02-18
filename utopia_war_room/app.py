@@ -826,6 +826,54 @@ def build_dashboard_analytics(
     }
 
 
+def build_event_entry(row: Dict[str, Any]) -> Dict[str, Any]:
+    category = (row["category"] or "other").lower()
+    summary = row["summary"] or ""
+    actor_raw = row["actor"]
+    target_raw = row["target"]
+    actor_kingdom = extract_kingdom(actor_raw)
+    target_kingdom = extract_kingdom(target_raw)
+    outcome = ""
+    acres = None
+    target_loss_acres = 0
+
+    if category == "attack":
+        attack = parse_attack_summary(summary)
+        actor_raw = attack["actor_raw"] or actor_raw
+        target_raw = attack["target_raw"] or target_raw
+        actor_kingdom = extract_kingdom(actor_raw)
+        target_kingdom = extract_kingdom(target_raw)
+        outcome = attack["outcome"]
+        acres_value = int(attack["acres"])
+        target_loss_value = int(attack.get("target_loss_acres", 0))
+        target_loss_acres = target_loss_value
+        impact_acres = acres_value if acres_value > 0 else target_loss_value
+        acres = impact_acres if impact_acres > 0 else None
+    elif category == "aid":
+        aid = parse_aid_summary(summary)
+        if aid:
+            actor_raw = aid["actor_raw"]
+            target_raw = aid["target_raw"]
+            actor_kingdom = extract_kingdom(actor_raw)
+            target_kingdom = extract_kingdom(target_raw)
+            outcome = "aid"
+
+    return {
+        "event_id": row["id"],
+        "fetched_at_utc": row["fetched_at_utc"],
+        "event_time_text": row["event_time_text"] or "",
+        "category": category,
+        "actor": normalize_party(actor_raw) or "-",
+        "target": normalize_party(target_raw) or "-",
+        "actor_kingdom": actor_kingdom,
+        "target_kingdom": target_kingdom,
+        "acres": acres,
+        "target_loss_acres": target_loss_acres,
+        "outcome": outcome,
+        "summary": summary,
+    }
+
+
 def build_latest_feed(rows: Optional[list[Dict[str, Any]]] = None, limit: int = 80) -> list[Dict[str, Any]]:
     if rows is None:
         rows = fetchall(
@@ -840,44 +888,213 @@ def build_latest_feed(rows: Optional[list[Dict[str, Any]]] = None, limit: int = 
     else:
         rows = sorted(rows, key=lambda row: row["id"], reverse=True)[:limit]
 
-    out = []
+    return [build_event_entry(row) for row in rows]
+
+
+def build_province_history(
+    province_name: str,
+    province_kingdom: Optional[str],
+    rows: list[Dict[str, Any]],
+    limit: int = 120,
+) -> Optional[Dict[str, Any]]:
+    normalized = normalize_party(province_name)
+    if not normalized:
+        return None
+
+    target_name = normalized.lower()
+    target_kingdom = (province_kingdom or "").strip()
+
+    stats = {
+        "attacks_sent": 0,
+        "attacks_received": 0,
+        "aid_sent": 0,
+        "aid_received": 0,
+        "gains": 0,
+        "losses": 0,
+    }
+    entries: list[Dict[str, Any]] = []
+
     for row in rows:
-        category = (row["category"] or "other").lower()
-        summary = row["summary"] or ""
-        actor_raw = row["actor"]
-        target_raw = row["target"]
-        outcome = ""
-        acres = None
+        event = build_event_entry(row)
+        actor_match = event["actor"].lower() == target_name
+        target_match = event["target"].lower() == target_name
+
+        if target_kingdom:
+            if actor_match and event["actor_kingdom"] and event["actor_kingdom"] != target_kingdom:
+                actor_match = False
+            if target_match and event["target_kingdom"] and event["target_kingdom"] != target_kingdom:
+                target_match = False
+
+        if not actor_match and not target_match:
+            continue
+
+        role = "both" if actor_match and target_match else ("actor" if actor_match else "target")
+        category = event["category"]
+        outcome = event["outcome"]
 
         if category == "attack":
-            attack = parse_attack_summary(summary)
-            actor_raw = attack["actor_raw"] or actor_raw
-            target_raw = attack["target_raw"] or target_raw
-            outcome = attack["outcome"]
-            impact_acres = int(attack["acres"]) if int(attack["acres"]) > 0 else int(attack.get("target_loss_acres", 0))
-            acres = impact_acres if impact_acres > 0 else None
+            if actor_match:
+                stats["attacks_sent"] += 1
+                if outcome == "success" and event["acres"]:
+                    stats["gains"] += int(event["acres"])
+            if target_match:
+                stats["attacks_received"] += 1
+                if outcome == "success":
+                    loss_acres = int(event["target_loss_acres"]) if int(event["target_loss_acres"]) > 0 else int(event["acres"] or 0)
+                    stats["losses"] += loss_acres
         elif category == "aid":
-            aid = parse_aid_summary(summary)
-            if aid:
-                actor_raw = aid["actor_raw"]
-                target_raw = aid["target_raw"]
-                outcome = "aid"
+            if actor_match:
+                stats["aid_sent"] += 1
+            if target_match:
+                stats["aid_received"] += 1
 
-        out.append(
+        entries.append(
             {
-                "event_id": row["id"],
-                "fetched_at_utc": row["fetched_at_utc"],
-                "event_time_text": row["event_time_text"] or "",
+                "event_id": event["event_id"],
+                "fetched_at_utc": event["fetched_at_utc"],
+                "event_time_text": event["event_time_text"] or "-",
                 "category": category,
-                "actor": normalize_party(actor_raw) or "-",
-                "target": normalize_party(target_raw) or "-",
-                "acres": acres,
-                "outcome": outcome,
-                "summary": summary,
+                "outcome": outcome or "-",
+                "acres": event["acres"] if event["acres"] is not None else "-",
+                "role": role,
+                "actor": event["actor"],
+                "target": event["target"],
+                "summary": event["summary"],
             }
         )
 
-    return out
+    entries.sort(key=lambda row: row["event_id"], reverse=True)
+    entries = entries[:limit]
+    stats["net"] = stats["gains"] - stats["losses"]
+
+    return {
+        "province": normalized,
+        "kingdom": target_kingdom or None,
+        "stats": stats,
+        "events": entries,
+    }
+
+
+def build_fact_detail(
+    fact: str,
+    key: Optional[str],
+    analytics: Dict[str, Any],
+    rows: list[Dict[str, Any]],
+) -> Dict[str, Any]:
+    fact_key = (fact or "").strip().lower()
+    detail = {
+        "title": "Fact Detail",
+        "summary": "No detail available for this selection.",
+        "rows": [],
+        "events": [],
+    }
+
+    if fact_key == "total_events":
+        detail["title"] = "Total Events"
+        detail["summary"] = f"Parsed events in scope: {analytics['kpis']['total_events']}."
+        detail["rows"] = [{"label": row["category"], "value": row["cnt"]} for row in analytics["category_totals"]]
+        return detail
+
+    if fact_key == "attack_success":
+        detail["title"] = "Attack Success"
+        detail["summary"] = (
+            f"Success rate {analytics['kpis']['attack_success_rate']}% "
+            f"({analytics['kpis']['successful_hits']} successful / {analytics['kpis']['failed_hits']} failed)."
+        )
+        detail["rows"] = [
+            {"label": "Successful Hits", "value": analytics["kpis"]["successful_hits"]},
+            {"label": "Failed Hits", "value": analytics["kpis"]["failed_hits"]},
+            {"label": "Total Attack Events", "value": analytics["kpis"]["total_attacks"]},
+        ]
+        failed_events = [
+            event for event in build_latest_feed(rows, limit=300) if event["category"] == "attack" and event["outcome"] == "failed"
+        ]
+        detail["events"] = failed_events[:25]
+        return detail
+
+    if fact_key == "home_net":
+        detail["title"] = "Home Net Acres"
+        detail["summary"] = (
+            f"Home net is {analytics['kpis']['home_net']} "
+            f"(gained {analytics['kpis']['home_gained']} / lost {analytics['kpis']['home_lost']})."
+        )
+        detail["rows"] = [
+            {"label": "Gained", "value": analytics["kpis"]["home_gained"]},
+            {"label": "Lost", "value": analytics["kpis"]["home_lost"]},
+            {"label": "Net", "value": analytics["kpis"]["home_net"]},
+        ]
+        return detail
+
+    if fact_key == "aid_shipments":
+        detail["title"] = "Aid Shipments"
+        detail["summary"] = f"Total aid events in scope: {analytics['kpis']['aid_shipments']}."
+        top_aid = sorted(analytics["active_rows"], key=lambda row: (row["aid_sent"] + row["aid_received"], row["aid_sent"]), reverse=True)
+        detail["rows"] = [
+            {
+                "label": f"{row['name']} ({row['kingdom'] or '?'})",
+                "value": f"out {row['aid_sent']} / in {row['aid_received']}",
+            }
+            for row in top_aid[:12]
+            if row["aid_sent"] > 0 or row["aid_received"] > 0
+        ]
+        return detail
+
+    if fact_key == "wars":
+        detail["title"] = "War Summary"
+        detail["summary"] = (
+            f"{analytics['kpis']['active_wars']} active / {analytics['kpis']['completed_wars']} completed. "
+            f"Victories {analytics['kpis']['war_victories']} / failures {analytics['kpis']['war_failures']}."
+        )
+        detail["rows"] = [
+            {
+                "label": row["war_label"],
+                "value": f"hits {row['hits_for']}:{row['hits_against']} acres {row['acres_for']}:{row['acres_against']}",
+            }
+            for row in analytics["war_rows"]
+        ]
+        return detail
+
+    if fact_key == "war" and key:
+        war_row = next((row for row in analytics["war_rows"] if row["war_id"] == str(key)), None)
+        if not war_row:
+            return detail
+        detail["title"] = f"War Detail: {war_row['opponent_name']}"
+        detail["summary"] = (
+            f"{war_row['start_day']} to {war_row['end_day']} [{war_row['result']}]. "
+            f"Hits {war_row['hits_for']}:{war_row['hits_against']} / Acres {war_row['acres_for']}:{war_row['acres_against']}."
+        )
+        detail["rows"] = [
+            {"label": "Opponent Kingdom", "value": war_row["opponent_kingdom"] or "-"},
+            {"label": "Post-war Expires", "value": war_row["postwar_expires"]},
+            {"label": "Post-war Ended", "value": war_row["postwar_end_day"]},
+            {"label": "Net Acres", "value": war_row["net_acres"]},
+        ]
+        return detail
+
+    if fact_key == "opponent" and key:
+        opp_row = next((row for row in analytics["opponent_rows"] if row["kingdom"] == key), None)
+        if not opp_row:
+            return detail
+        detail["title"] = f"Opponent Pressure: {key}"
+        detail["summary"] = (
+            f"Hits {opp_row['hits_for']} for / {opp_row['hits_against']} against. "
+            f"Acres {opp_row['acres_for']} for / {opp_row['acres_against']} against (net {opp_row['net']})."
+        )
+        detail["rows"] = [
+            {"label": "Hits For", "value": opp_row["hits_for"]},
+            {"label": "Hits Against", "value": opp_row["hits_against"]},
+            {"label": "Acres For", "value": opp_row["acres_for"]},
+            {"label": "Acres Against", "value": opp_row["acres_against"]},
+            {"label": "Net", "value": opp_row["net"]},
+        ]
+        detail["events"] = [
+            event
+            for event in build_latest_feed(rows, limit=300)
+            if event["category"] == "attack" and (event["actor_kingdom"] == key or event["target_kingdom"] == key)
+        ][:25]
+        return detail
+
+    return detail
 
 
 def ingest_loop(config_path: str, stop_event: threading.Event) -> None:
@@ -1033,6 +1250,40 @@ def api_wars():
             "rows": analytics["war_rows"],
         }
     )
+
+
+@app.route("/api/province_history")
+def api_province_history():
+    init_db()
+    name = (request.args.get("name") or "").strip()
+    kingdom = (request.args.get("kingdom") or "").strip() or None
+    if not name:
+        return jsonify({"error": "missing_name"}), 400
+
+    _, _, _, filtered_rows = war_context()
+    payload = build_province_history(name, kingdom, filtered_rows)
+    if not payload:
+        return jsonify({"error": "invalid_name"}), 400
+    return jsonify(payload)
+
+
+@app.route("/api/fact_detail")
+def api_fact_detail():
+    init_db()
+    fact = (request.args.get("fact") or "").strip()
+    key = (request.args.get("key") or "").strip() or None
+    _, full_analytics, _, filtered_rows = war_context()
+    analytics = build_dashboard_analytics(
+        filtered_rows,
+        forced_home_kingdom=full_analytics["home_kingdom"],
+        include_wars=False,
+    )
+    analytics["war_rows"] = full_analytics["war_rows"]
+    analytics["kpis"]["active_wars"] = full_analytics["kpis"]["active_wars"]
+    analytics["kpis"]["completed_wars"] = full_analytics["kpis"]["completed_wars"]
+    analytics["kpis"]["war_victories"] = full_analytics["kpis"]["war_victories"]
+    analytics["kpis"]["war_failures"] = full_analytics["kpis"]["war_failures"]
+    return jsonify(build_fact_detail(fact, key, analytics, filtered_rows))
 
 
 @app.route("/api/status")
