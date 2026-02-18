@@ -1,0 +1,15 @@
+{
+  "base_url": "https://utopia-game.com",
+  "world": "wol",
+  "pages": {
+    "kingdom_news": {
+      "path": "/wol/game/kingdom_news",
+      "crawl": true,
+      "max_pages": 12
+    }
+  },
+  "cookies": {
+    "sessionid": "PASTE_YOUR_SESSIONID_COOKIE_VALUE"
+  },
+  "poll_seconds": 300
+}

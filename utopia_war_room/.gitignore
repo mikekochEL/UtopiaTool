@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+
+# Virtualenvs
+.venv/
+venv/
+env/
+
+# Local runtime data
+config.json
+utopia.db
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-shm
+*.db-wal
+
+# Logs and local secrets
+*.log
+.env
+
