@@ -29,6 +29,69 @@ function categorySort(categories) {
   });
 }
 
+function activeWarParam() {
+  const params = new URLSearchParams(window.location.search);
+  const war = (params.get("war") || "").trim();
+  return war && war.toLowerCase() !== "all" ? war : "";
+}
+
+function apiUrl(path) {
+  const war = activeWarParam();
+  if (!war) return path;
+  const url = new URL(path, window.location.origin);
+  url.searchParams.set("war", war);
+  return url.pathname + url.search;
+}
+
+function setupWarFilter() {
+  const select = document.getElementById("warSelect");
+  if (!select) return;
+
+  select.addEventListener("change", () => {
+    const params = new URLSearchParams(window.location.search);
+    const value = (select.value || "all").trim();
+    if (!value || value.toLowerCase() === "all") {
+      params.delete("war");
+    } else {
+      params.set("war", value);
+    }
+    const query = params.toString();
+    window.location.href = query ? `/?${query}` : "/";
+  });
+}
+
+function setupEventDetails() {
+  const rows = [...document.querySelectorAll("tr.event-row")];
+  if (!rows.length) return;
+
+  const meta = document.getElementById("eventDetailMeta");
+  const summary = document.getElementById("eventDetailSummary");
+  const hint = document.getElementById("eventDetailHint");
+  if (!meta || !summary || !hint) return;
+
+  const renderRow = (row) => {
+    rows.forEach((r) => r.classList.remove("active"));
+    row.classList.add("active");
+    const d = row.dataset;
+    hint.textContent = `Event #${d.eventId || "-"}`;
+    meta.innerHTML = `
+      <div><strong>Fetched:</strong> ${d.fetched || "-"}</div>
+      <div><strong>Day:</strong> ${d.day || "-"}</div>
+      <div><strong>Category:</strong> ${d.category || "-"}</div>
+      <div><strong>Outcome:</strong> ${d.outcome || "-"}</div>
+      <div><strong>Acres:</strong> ${d.acres || "-"}</div>
+      <div><strong>Actor -> Target:</strong> ${(d.actor || "-")} -> ${(d.target || "-")}</div>
+    `;
+    summary.textContent = d.summary || "No summary";
+  };
+
+  rows.forEach((row) => {
+    row.addEventListener("click", () => renderRow(row));
+  });
+
+  renderRow(rows[0]);
+}
+
 function setText(id, value) {
   const el = document.getElementById(id);
   if (!el) return;
@@ -85,7 +148,7 @@ async function loadMomentumChart() {
   const canvas = document.getElementById("momentumChart");
   if (!canvas) return;
 
-  const resp = await fetch("/api/momentum");
+  const resp = await fetch(apiUrl("/api/momentum"));
   if (!resp.ok) return;
 
   const rows = await resp.json();
@@ -143,7 +206,7 @@ async function loadLandSwingChart() {
   const canvas = document.getElementById("landSwingChart");
   if (!canvas) return;
 
-  const resp = await fetch("/api/land_swing");
+  const resp = await fetch(apiUrl("/api/land_swing"));
   if (!resp.ok) return;
 
   const payload = await resp.json();
@@ -230,6 +293,8 @@ async function loadLandSwingChart() {
 }
 
 async function bootstrap() {
+  setupWarFilter();
+  setupEventDetails();
   await Promise.all([loadMomentumChart(), loadLandSwingChart()]);
   watchForLiveUpdates();
 }

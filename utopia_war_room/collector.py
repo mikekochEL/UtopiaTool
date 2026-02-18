@@ -41,6 +41,8 @@ def load_config(path: str = "config.json") -> Dict[str, Any]:
     - UTOPIA_BASE_URL
     - UTOPIA_WORLD
     - UTOPIA_KINGDOM_NEWS_PATH
+    - UTOPIA_ENABLE_INTEL_OPS
+    - UTOPIA_INTEL_OPS_URL
     - UTOPIA_CRAWL
     - UTOPIA_MAX_PAGES
     - UTOPIA_POLL_SECONDS
@@ -70,6 +72,21 @@ def load_config(path: str = "config.json") -> Dict[str, Any]:
     news_max_pages = int(os.getenv("UTOPIA_MAX_PAGES", str(file_news_max)))
     poll_seconds = int(os.getenv("UTOPIA_POLL_SECONDS", str(file_cfg.get("poll_seconds", 300))))
 
+    file_intel = file_pages.get("intel_ops", {})
+    file_intel_path = ""
+    file_intel_crawl = True
+    file_intel_max = 20
+    if isinstance(file_intel, str):
+        file_intel_path = file_intel
+    elif isinstance(file_intel, dict) and file_intel:
+        file_intel_path = str(file_intel.get("path", "https://intel.utopia-game.com/"))
+        file_intel_crawl = bool(file_intel.get("crawl", False))
+        file_intel_max = max(1, int(file_intel.get("max_pages", 1)))
+
+    intel_ops_url = os.getenv("UTOPIA_INTEL_OPS_URL", file_intel_path)
+    intel_enabled_default = bool(file_intel_path)
+    intel_enabled = env_truthy(os.getenv("UTOPIA_ENABLE_INTEL_OPS"), default=intel_enabled_default)
+
     cookies: Dict[str, str] = {}
     cookies.update(file_cfg.get("cookies", {}))
 
@@ -84,23 +101,42 @@ def load_config(path: str = "config.json") -> Dict[str, Any]:
         cookie_name = os.getenv("UTOPIA_SESSION_COOKIE_NAME", "sessionid")
         cookies[cookie_name] = sessionid
 
+    pages: Dict[str, Dict[str, Any]] = {
+        "kingdom_news": {
+            "path": news_path,
+            "crawl": news_crawl,
+            "max_pages": max(1, news_max_pages),
+        }
+    }
+    if intel_enabled and intel_ops_url:
+        pages["intel_ops"] = {
+            "path": intel_ops_url,
+            "crawl": file_intel_crawl,
+            "max_pages": file_intel_max,
+        }
+
     return {
         "base_url": base_url,
         "world": world,
-        "pages": {
-            "kingdom_news": {
-                "path": news_path,
-                "crawl": news_crawl,
-                "max_pages": max(1, news_max_pages),
-            }
-        },
+        "pages": pages,
         "cookies": cookies,
         "poll_seconds": max(15, poll_seconds),
     }
 
 
 def build_url(base_url: str, path_or_url: str) -> str:
+    parsed = urlparse(path_or_url)
+    if parsed.scheme and parsed.netloc:
+        return path_or_url
     return urljoin(base_url.rstrip("/") + "/", path_or_url)
+
+
+def canonical_url(base_url: str, path_or_url: str) -> str:
+    absolute = urlparse(build_url(base_url, path_or_url))
+    path = absolute.path or "/"
+    if absolute.query:
+        return f"{absolute.scheme}://{absolute.netloc}{path}?{absolute.query}"
+    return f"{absolute.scheme}://{absolute.netloc}{path}"
 
 
 def internal_path(base_url: str, path_or_url: str) -> str | None:
@@ -159,8 +195,10 @@ def extract_related_paths(base_url: str, html: str, seed_path: str) -> List[str]
         return []
 
     prefix = seed_normalized.split("?", 1)[0].rstrip("/")
+    root_mode = False
     if not prefix:
-        return []
+        prefix = "/"
+        root_mode = True
 
     soup = BeautifulSoup(html, "html.parser")
     out: List[str] = []
@@ -172,7 +210,12 @@ def extract_related_paths(base_url: str, html: str, seed_path: str) -> List[str]
             continue
 
         candidate_path = candidate.split("?", 1)[0]
-        if candidate_path == prefix or candidate_path.startswith(prefix + "/"):
+        matches_seed_scope = (
+            candidate_path.startswith("/")
+            if root_mode
+            else (candidate_path == prefix or candidate_path.startswith(prefix + "/"))
+        )
+        if matches_seed_scope:
             if candidate not in seen:
                 seen.add(candidate)
                 out.append(candidate)
@@ -189,18 +232,20 @@ def collect_page_family(
     max_pages: int,
 ) -> int:
     queue: Deque[str] = deque([seed_path])
+    queued = {canonical_url(base_url, seed_path)}
     seen = set()
     fetched = 0
 
     while queue and len(seen) < max_pages:
         path = queue.popleft()
-        normalized = internal_path(base_url, path)
-        if not normalized or normalized in seen:
+        normalized = canonical_url(base_url, path)
+        queued.discard(normalized)
+        if normalized in seen:
             continue
 
         seen.add(normalized)
 
-        url = build_url(base_url, normalized)
+        url = build_url(base_url, path)
         response = fetch_page(session, url)
         html = response.text or ""
         inserted = store_fetch(page_key, url, response.status_code, html)
@@ -214,10 +259,12 @@ def collect_page_family(
 
         if crawl and response.ok:
             for next_path in extract_related_paths(base_url, html, seed_path):
-                if next_path not in seen and next_path not in queue:
+                next_norm = canonical_url(base_url, next_path)
+                if next_norm not in seen and next_norm not in queued:
                     if len(seen) + len(queue) >= max_pages:
                         break
                     queue.append(next_path)
+                    queued.add(next_norm)
 
     return fetched
 
@@ -241,9 +288,13 @@ def run_once(config_path: str = "config.json") -> None:
 
         for page_key, page_spec in pages.items():
             path, crawl, max_pages = parse_page_spec(page_key, page_spec)
+            page_base = base_url
+            parsed_seed = urlparse(path)
+            if parsed_seed.scheme and parsed_seed.netloc:
+                page_base = f"{parsed_seed.scheme}://{parsed_seed.netloc}"
             collect_page_family(
                 session=session,
-                base_url=base_url,
+                base_url=page_base,
                 page_key=page_key,
                 seed_path=path,
                 crawl=crawl,

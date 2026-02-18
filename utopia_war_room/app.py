@@ -7,7 +7,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
-from flask import Flask, jsonify, render_template
+from flask import Flask, jsonify, render_template, request
 
 from collector import load_config, run_once as run_collect_once
 from db import fetchall, init_db
@@ -348,15 +348,56 @@ def ensure_party(stats_by_name: Dict[str, Dict[str, Any]], raw_name: Optional[st
     return row
 
 
-def build_momentum_rows() -> list[Dict[str, Any]]:
-    rows = fetchall(
+def fetch_event_rows() -> list[Dict[str, Any]]:
+    return fetchall(
         """
-        SELECT event_time_text, category
+        SELECT id, fetched_at_utc, event_time_text, category, actor, target, summary
         FROM kd_news_events
-        WHERE event_time_text IS NOT NULL AND event_time_text <> ''
+        ORDER BY id ASC
         """
     )
 
+
+def day_in_range(day_key, start_key, end_key) -> bool:
+    if not day_key or not start_key:
+        return False
+    if day_key < start_key:
+        return False
+    if end_key and day_key > end_key:
+        return False
+    return True
+
+
+def resolve_selected_war(war_rows: list[Dict[str, Any]], war_id: Optional[str]) -> Optional[Dict[str, Any]]:
+    if not war_id:
+        return None
+    needle = str(war_id).strip()
+    if not needle:
+        return None
+    for row in war_rows:
+        if str(row.get("war_id", "")).strip() == needle:
+            return row
+    return None
+
+
+def filter_rows_for_war(rows: list[Dict[str, Any]], selected_war: Optional[Dict[str, Any]]) -> list[Dict[str, Any]]:
+    if not selected_war:
+        return rows
+
+    start_key = selected_war.get("start_key")
+    end_key = selected_war.get("end_key")
+    if not start_key:
+        return rows
+
+    filtered: list[Dict[str, Any]] = []
+    for row in rows:
+        day_key = parse_event_day(row["event_time_text"])
+        if day_in_range(day_key, start_key, end_key):
+            filtered.append(row)
+    return filtered
+
+
+def build_momentum_rows(rows: list[Dict[str, Any]]) -> list[Dict[str, Any]]:
     counts_by_day: dict[tuple[int, int, int], dict[str, int]] = defaultdict(lambda: defaultdict(int))
     for row in rows:
         day_key = parse_event_day(row["event_time_text"])
@@ -385,6 +426,7 @@ def build_war_rows(
 ) -> list[Dict[str, Any]]:
     wars: list[Dict[str, Any]] = []
     open_wars: list[Dict[str, Any]] = []
+    war_seq = 0
 
     def day_in_war(day_key, war_row) -> bool:
         if not day_key or not war_row["start_key"]:
@@ -423,11 +465,13 @@ def build_war_rows(
         day_text = event["event_time_text"] or ""
 
         if event_type == "declare":
+            war_seq += 1
             opponent_raw = extract_war_opponent(summary)
             opponent_name = normalize_party(opponent_raw) or (opponent_raw or "Unknown Kingdom")
             opponent_kingdom = extract_kingdom(opponent_raw)
 
             war_row = {
+                "war_id": str(war_seq),
                 "opponent_name": opponent_name,
                 "opponent_kingdom": opponent_kingdom,
                 "start_day": day_text,
@@ -518,6 +562,10 @@ def build_war_rows(
             war_row["postwar_expires"] = "-"
         if not war_row["postwar_end_day"]:
             war_row["postwar_end_day"] = "-"
+        war_row["war_label"] = (
+            f"{war_row['start_day']} -> {war_row['end_day']} vs {war_row['opponent_name']} "
+            f"({war_row['opponent_kingdom'] or '?'}) [{war_row['result']}]"
+        )
 
     wars.sort(
         key=lambda row: row["start_key"] if row["start_key"] else (-1, -1, -1),
@@ -526,14 +574,13 @@ def build_war_rows(
     return wars
 
 
-def build_dashboard_analytics() -> Dict[str, Any]:
-    rows = fetchall(
-        """
-        SELECT id, fetched_at_utc, event_time_text, category, actor, target, summary
-        FROM kd_news_events
-        ORDER BY id ASC
-        """
-    )
+def build_dashboard_analytics(
+    rows: Optional[list[Dict[str, Any]]] = None,
+    forced_home_kingdom: Optional[str] = None,
+    include_wars: bool = True,
+) -> Dict[str, Any]:
+    if rows is None:
+        rows = fetch_event_rows()
 
     category_counts: dict[str, int] = defaultdict(int)
     provinces: Dict[str, Dict[str, Any]] = {}
@@ -632,8 +679,8 @@ def build_dashboard_analytics() -> Dict[str, Any]:
             }
         )
 
-    home_kingdom = None
-    if kingdom_mentions:
+    home_kingdom = forced_home_kingdom
+    if not home_kingdom and kingdom_mentions:
         home_kingdom = sorted(kingdom_mentions.items(), key=lambda item: (-item[1], item[0]))[0][0]
 
     opponent_pressure: dict[str, Dict[str, Any]] = defaultdict(
@@ -741,7 +788,7 @@ def build_dashboard_analytics() -> Dict[str, Any]:
         key=lambda row: row["cnt"],
         reverse=True,
     )
-    war_rows = build_war_rows(war_events, attack_records, home_kingdom)
+    war_rows = build_war_rows(war_events, attack_records, home_kingdom) if include_wars else []
     active_wars = sum(1 for row in war_rows if row["status"] == "active")
     completed_wars = len(war_rows) - active_wars
     war_victories = sum(1 for row in war_rows if row["result"] == "victory")
@@ -779,16 +826,19 @@ def build_dashboard_analytics() -> Dict[str, Any]:
     }
 
 
-def build_latest_feed(limit: int = 80) -> list[Dict[str, Any]]:
-    rows = fetchall(
-        """
-        SELECT fetched_at_utc, event_time_text, category, actor, target, summary
-        FROM kd_news_events
-        ORDER BY id DESC
-        LIMIT ?
-        """,
-        (limit,),
-    )
+def build_latest_feed(rows: Optional[list[Dict[str, Any]]] = None, limit: int = 80) -> list[Dict[str, Any]]:
+    if rows is None:
+        rows = fetchall(
+            """
+            SELECT id, fetched_at_utc, event_time_text, category, actor, target, summary
+            FROM kd_news_events
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (limit,),
+        )
+    else:
+        rows = sorted(rows, key=lambda row: row["id"], reverse=True)[:limit]
 
     out = []
     for row in rows:
@@ -815,6 +865,7 @@ def build_latest_feed(limit: int = 80) -> list[Dict[str, Any]]:
 
         out.append(
             {
+                "event_id": row["id"],
                 "fetched_at_utc": row["fetched_at_utc"],
                 "event_time_text": row["event_time_text"] or "",
                 "category": category,
@@ -902,11 +953,38 @@ def maybe_start_ingest_for_wsgi() -> None:
         print(f"[app] WSGI ingest thread started using config={config_path}")
 
 
+def requested_war_id() -> Optional[str]:
+    raw = (request.args.get("war") or "").strip()
+    if not raw or raw.lower() == "all":
+        return None
+    return raw
+
+
+def war_context():
+    all_rows = fetch_event_rows()
+    full_analytics = build_dashboard_analytics(all_rows)
+    selected_war = resolve_selected_war(full_analytics["war_rows"], requested_war_id())
+    filtered_rows = filter_rows_for_war(all_rows, selected_war)
+    return all_rows, full_analytics, selected_war, filtered_rows
+
+
 @app.route("/")
 def dashboard():
     init_db()
-    analytics = build_dashboard_analytics()
-    latest = build_latest_feed()
+    _, full_analytics, selected_war, filtered_rows = war_context()
+    analytics = build_dashboard_analytics(
+        filtered_rows,
+        forced_home_kingdom=full_analytics["home_kingdom"],
+        include_wars=False,
+    )
+    analytics["war_rows"] = full_analytics["war_rows"]
+    analytics["selected_war_id"] = selected_war["war_id"] if selected_war else "all"
+    analytics["selected_war_label"] = selected_war["war_label"] if selected_war else "All events"
+    analytics["kpis"]["active_wars"] = full_analytics["kpis"]["active_wars"]
+    analytics["kpis"]["completed_wars"] = full_analytics["kpis"]["completed_wars"]
+    analytics["kpis"]["war_victories"] = full_analytics["kpis"]["war_victories"]
+    analytics["kpis"]["war_failures"] = full_analytics["kpis"]["war_failures"]
+    latest = build_latest_feed(filtered_rows)
     return render_template(
         "dashboard.html",
         analytics=analytics,
@@ -918,13 +996,19 @@ def dashboard():
 @app.route("/api/momentum")
 def api_momentum():
     init_db()
-    return jsonify(build_momentum_rows())
+    _, _, _, filtered_rows = war_context()
+    return jsonify(build_momentum_rows(filtered_rows))
 
 
 @app.route("/api/land_swing")
 def api_land_swing():
     init_db()
-    analytics = build_dashboard_analytics()
+    _, full_analytics, _, filtered_rows = war_context()
+    analytics = build_dashboard_analytics(
+        filtered_rows,
+        forced_home_kingdom=full_analytics["home_kingdom"],
+        include_wars=False,
+    )
     return jsonify(
         {
             "home_kingdom": analytics["home_kingdom"],

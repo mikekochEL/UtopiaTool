@@ -1,6 +1,6 @@
 # Deploy to Render (Live Updating)
 
-Use a **Web Service** on Render.
+Use a `Web Service` on Render.
 
 ## Canonical Settings
 
@@ -11,13 +11,13 @@ Use a **Web Service** on Render.
 
 ## Environment Variables
 
-Set these in Render:
+Required:
 
 - `UTOPIA_ENABLE_INGEST` = `1`
 - `UTOPIA_DB_PATH` = `/data/utopia.db`
 - `UTOPIA_SESSIONID` = `<your current utopia session cookie>`
 
-Recommended defaults:
+Recommended:
 
 - `UTOPIA_SESSION_COOKIE_NAME` = `sessionid`
 - `UTOPIA_BASE_URL` = `https://utopia-game.com`
@@ -25,6 +25,8 @@ Recommended defaults:
 - `UTOPIA_KINGDOM_NEWS_PATH` = `/wol/game/kingdom_news`
 - `UTOPIA_CRAWL` = `true`
 - `UTOPIA_MAX_PAGES` = `12`
+- `UTOPIA_ENABLE_INTEL_OPS` = `1` (optional)
+- `UTOPIA_INTEL_OPS_URL` = `https://intel.utopia-game.com/` (optional)
 - `UTOPIA_POLL_SECONDS` = `300`
 
 ## Persistent Storage
@@ -34,14 +36,14 @@ Add a disk:
 - `Mount Path`: `/data`
 - `Size`: `1 GB` (or higher)
 
-Without a persistent disk, DB data will reset on restart.
+Without a persistent disk, DB data resets on restart.
 
 ## Plan
 
-Use **Starter** (or higher) for reliable always-on ingest and persistent disk.
-Free plan spins down and does not support persistent disks.
+Use `Starter` (or higher) for reliable always-on ingest and persistent disk.
+Free plan sleeps and has no persistent disk support.
 
-## What “Good” Looks Like in Logs
+## What "Good" Looks Like in Logs
 
 You should see:
 

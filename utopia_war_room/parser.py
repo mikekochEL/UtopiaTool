@@ -4,11 +4,33 @@ from typing import List, Optional, Tuple
 
 from bs4 import BeautifulSoup
 
-from db import execute, executemany, fetchall, init_db
+from db import executemany, fetchall, init_db
 
 EVENT_LINE_RE = re.compile(
     r"^(?P<time>(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d+\s+of\s+YR\d+)\s+(?P<rest>.+)$"
 )
+INTEL_OP_KEYWORDS = [
+    "thie",
+    "thief",
+    "operation",
+    "op ",
+    "nightstrike",
+    "propaganda",
+    "rob",
+    "stole",
+    "steal",
+    "kidnap",
+    "spy",
+    "sabotage",
+    "assassinate",
+    "wizard",
+    "spell",
+    "magic",
+    "meteor",
+    "fireball",
+    "failed",
+    "succeeded",
+]
 
 AID_RE = re.compile(r"^(?P<actor>.+?) has sent an aid shipment to (?P<target>.+?)\.$", re.IGNORECASE)
 ATTACK_ACTOR_TARGET_RE = re.compile(
@@ -30,6 +52,13 @@ def fetch_html_rows(page_key: str):
         "SELECT id, fetched_at_utc, raw_html FROM fetch_log WHERE page_key=? ORDER BY id ASC",
         (page_key,),
     )
+
+
+def list_page_keys(explicit_page_key: Optional[str] = None) -> List[str]:
+    if explicit_page_key:
+        return [explicit_page_key]
+    rows = fetchall("SELECT DISTINCT page_key FROM fetch_log ORDER BY page_key ASC")
+    return [row["page_key"] for row in rows]
 
 
 def extract_news_lines(html: str) -> List[str]:
@@ -56,6 +85,36 @@ def extract_news_lines(html: str) -> List[str]:
         if text and EVENT_LINE_RE.match(text) and text not in seen:
             seen.add(text)
             out.append(text)
+
+    return out
+
+
+def extract_intel_ops_lines(html: str) -> List[str]:
+    soup = BeautifulSoup(html, "html.parser")
+    container = soup.select_one("#content-area") or soup.select_one(".game-content") or soup.body
+    if not container:
+        return []
+
+    out: List[str] = []
+    seen = set()
+
+    def maybe_add(text: str) -> None:
+        line = normalize_text(text)
+        if len(line) < 18:
+            return
+        lowered = line.lower()
+        if not any(keyword in lowered for keyword in INTEL_OP_KEYWORDS):
+            return
+        if line in seen:
+            return
+        seen.add(line)
+        out.append(line)
+
+    for node in container.select("tr, li, p, div"):
+        maybe_add(node.get_text(" ", strip=True))
+
+    for raw_line in container.get_text("\n", strip=True).splitlines():
+        maybe_add(raw_line)
 
     return out
 
@@ -147,52 +206,57 @@ ON CONFLICT(sha256) DO UPDATE SET
 """
 
 
-def parse_and_store_news(page_key: str = "kingdom_news") -> int:
+def parse_and_store_news(page_key: Optional[str] = None) -> int:
     init_db()
-
-    fetch_rows = fetch_html_rows(page_key)
-    if not fetch_rows:
-        print("[parser] No HTML available yet. Run collector first.")
-        return 0
 
     total_extracted = 0
     unique_in_run = set()
     rows_to_upsert = []
+    total_fetches = 0
+    page_keys = list_page_keys(page_key)
+    if not page_keys:
+        print("[parser] No HTML available yet. Run collector first.")
+        return 0
 
-    for fetch_row in fetch_rows:
-        lines = extract_news_lines(fetch_row["raw_html"])
-        total_extracted += len(lines)
+    for key in page_keys:
+        fetch_rows = fetch_html_rows(key)
+        total_fetches += len(fetch_rows)
+        for fetch_row in fetch_rows:
+            if key == "intel_ops":
+                lines = extract_intel_ops_lines(fetch_row["raw_html"])
+            else:
+                lines = extract_news_lines(fetch_row["raw_html"])
+            total_extracted += len(lines)
 
-        for line in lines:
-            digest = sha256_text(line)
-            if digest in unique_in_run:
-                continue
+            for line in lines:
+                digest = sha256_text(line)
+                if digest in unique_in_run:
+                    continue
 
-            unique_in_run.add(digest)
-            event_time_text, summary = split_event_line(line)
-            category, actor, target, summary_text = classify_line(summary)
-            rows_to_upsert.append(
-                (
-                    fetch_row["fetched_at_utc"],
-                    event_time_text,
-                    category,
-                    actor,
-                    target,
-                    summary_text,
-                    line,
-                    digest,
+                unique_in_run.add(digest)
+                event_time_text, summary = split_event_line(line)
+                category, actor, target, summary_text = classify_line(summary)
+                rows_to_upsert.append(
+                    (
+                        fetch_row["fetched_at_utc"],
+                        event_time_text,
+                        category,
+                        actor,
+                        target,
+                        summary_text,
+                        line,
+                        digest,
+                    )
                 )
-            )
 
     if not rows_to_upsert:
         print("[parser] No event lines extracted from stored fetches.")
         return 0
 
     changed = executemany(UPSERT_SQL, rows_to_upsert)
-    removed = execute("DELETE FROM kd_news_events WHERE event_time_text IS NULL OR event_time_text = ''")
     print(
-        f"[parser] fetches={len(fetch_rows)} extracted={total_extracted} "
-        f"unique={len(rows_to_upsert)} upserted={max(changed, 0)} removed={max(removed, 0)}"
+        f"[parser] fetches={total_fetches} extracted={total_extracted} "
+        f"unique={len(rows_to_upsert)} upserted={max(changed, 0)}"
     )
     return len(rows_to_upsert)
 

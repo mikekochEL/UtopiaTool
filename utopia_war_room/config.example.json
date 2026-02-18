@@ -6,6 +6,11 @@
       "path": "/wol/game/kingdom_news",
       "crawl": true,
       "max_pages": 12
+    },
+    "intel_ops": {
+      "path": "https://intel.utopia-game.com/",
+      "crawl": true,
+      "max_pages": 20
     }
   },
   "cookies": {

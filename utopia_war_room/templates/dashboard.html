@@ -263,6 +263,54 @@
       font-size: 12px;
     }
 
+    .war-filter {
+      margin-top: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .war-filter select {
+      background: rgba(20, 41, 67, 0.95);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 8px;
+      min-width: 340px;
+      max-width: 100%;
+    }
+
+    tr.event-row {
+      cursor: pointer;
+    }
+
+    tr.event-row:hover {
+      background: rgba(83, 177, 255, 0.08);
+    }
+
+    tr.event-row.active {
+      background: rgba(83, 177, 255, 0.15);
+    }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 8px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .detail-summary {
+      margin: 0;
+      white-space: pre-wrap;
+      font-size: 14px;
+      color: var(--text);
+      line-height: 1.5;
+    }
+
     @media (max-width: 1220px) {
       .charts {
         grid-template-columns: 1fr;
@@ -291,8 +339,20 @@
         <h1>Utopia War Room</h1>
         <p class="subtitle">
           Home kingdom inference: <strong>{{ analytics["home_kingdom"] or "unknown" }}</strong>
+          | Scope: <strong>{{ analytics["selected_war_label"] }}</strong>
           | Run mode: <code>python app.py</code>
         </p>
+        <form class="war-filter">
+          <label for="warSelect">War Filter</label>
+          <select id="warSelect" name="war">
+            <option value="all" {% if analytics["selected_war_id"] == "all" %}selected{% endif %}>All events</option>
+            {% for row in analytics["war_rows"] %}
+              <option value="{{ row['war_id'] }}" {% if analytics["selected_war_id"] == row["war_id"] %}selected{% endif %}>
+                {{ row["war_label"] }}
+              </option>
+            {% endfor %}
+          </select>
+        </form>
       </div>
       <div class="statusline" id="ingestStatus">
         <div>
@@ -543,7 +603,18 @@
             <th>Summary</th>
           </tr>
           {% for row in latest %}
-            <tr>
+            <tr
+              class="event-row"
+              data-event-id="{{ row['event_id'] }}"
+              data-fetched="{{ row['fetched_at_utc'] }}"
+              data-day="{{ row['event_time_text'] or '-' }}"
+              data-category="{{ row['category'] }}"
+              data-outcome="{{ row['outcome'] or '-' }}"
+              data-acres="{{ row['acres'] if row['acres'] is not none else '-' }}"
+              data-actor="{{ row['actor'] }}"
+              data-target="{{ row['target'] }}"
+              data-summary="{{ row['summary']|e }}"
+            >
               <td>{{ row["fetched_at_utc"] }}</td>
               <td>{{ row["event_time_text"] or "-" }}</td>
               <td>{{ row["category"] }}</td>
@@ -562,6 +633,13 @@
           {% endfor %}
         </table>
       </div>
+    </section>
+
+    <section id="eventDetail" class="card" style="margin-top: 12px;">
+      <h3>Event Detail</h3>
+      <p id="eventDetailHint" class="hint">Click any row in Latest Event Feed to inspect details.</p>
+      <div id="eventDetailMeta" class="detail-grid"></div>
+      <p id="eventDetailSummary" class="detail-summary">No event selected.</p>
     </section>
 
     <p class="footer-note">
