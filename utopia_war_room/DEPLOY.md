@@ -1,63 +1,59 @@
-# Public Deployment Guide
+# Deploy to Render (Live Updating)
 
-This project is now configured for production serving with `gunicorn`.
+Use a **Web Service** on Render.
 
-## Included deploy files
+## Canonical Settings
 
-- `requirements.txt` includes `gunicorn`
-- `Procfile` for Railway/Heroku-style runtimes
-- `railway.toml` for Railway deploy defaults
-- `render.yaml` for Render Blueprint deploy
-- `.gitignore` excludes `config.json`, `utopia.db`, and local secrets
+- `Root Directory`: `utopia_war_room`
+- `Build Command`: `pip install -r requirements.txt`
+- `Start Command`: `gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120 --access-logfile -`
+- `Health Check Path`: `/healthz`
 
-## 1) Fastest public URL (no hosting account)
+## Environment Variables
 
-Run locally and tunnel it:
+Set these in Render:
 
-```powershell
-python app.py
-cloudflared tunnel --url http://127.0.0.1:5055
-```
+- `UTOPIA_ENABLE_INGEST` = `1`
+- `UTOPIA_DB_PATH` = `/data/utopia.db`
+- `UTOPIA_SESSIONID` = `<your current utopia session cookie>`
 
-Share the generated `trycloudflare.com` URL.
+Recommended defaults:
 
-## 2) Render deploy (managed hosting)
+- `UTOPIA_SESSION_COOKIE_NAME` = `sessionid`
+- `UTOPIA_BASE_URL` = `https://utopia-game.com`
+- `UTOPIA_WORLD` = `wol`
+- `UTOPIA_KINGDOM_NEWS_PATH` = `/wol/game/kingdom_news`
+- `UTOPIA_CRAWL` = `true`
+- `UTOPIA_MAX_PAGES` = `12`
+- `UTOPIA_POLL_SECONDS` = `300`
 
-1. Push this folder to GitHub.
-2. In Render, create from Blueprint (`render.yaml` is auto-detected).
-3. Render will run:
+## Persistent Storage
 
-```bash
-gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 120 --access-logfile -
-```
+Add a disk:
 
-4. Health check endpoint:
+- `Mount Path`: `/data`
+- `Size`: `1 GB` (or higher)
 
-```text
-/healthz
-```
+Without a persistent disk, DB data will reset on restart.
 
-Notes:
-- `UTOPIA_DB_PATH` defaults to `/data/utopia.db` in `render.yaml`.
-- The hosted app under `gunicorn` is dashboard-only (no collector loop in web workers).
+## Plan
 
-## 3) Railway deploy
+Use **Starter** (or higher) for reliable always-on ingest and persistent disk.
+Free plan spins down and does not support persistent disks.
 
-1. Push to GitHub.
-2. Create a Railway project from repo.
-3. Railway will use `railway.toml` start command (or fallback `Procfile`).
-4. Add a persistent volume and set:
+## What “Good” Looks Like in Logs
 
-```text
-UTOPIA_DB_PATH=/data/utopia.db
-```
+You should see:
 
-## Data strategy (important)
+- `[app] WSGI ingest thread started ...`
+- `[collector] ... status=200 ...`
+- `[parser] fetches=... extracted=...`
 
-- Keep ingestion private (your cookie stays local in `config.json`).
-- Keep the public app read-only and publish DB snapshots.
+## If You Leave Root Directory Blank
 
-Recommended workflow:
-1. Local machine runs ingestion (`python app.py` or collector/parser loop).
-2. Public host serves dashboard from a copied snapshot DB.
-3. Never commit `config.json` or session cookies.
+Use this alternate pair instead:
+
+- Build: `pip install -r utopia_war_room/requirements.txt`
+- Start: `gunicorn app:app --chdir utopia_war_room --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120 --access-logfile -`
+
+Do not mix both patterns.

@@ -7,6 +7,7 @@ const CATEGORY_COLORS = {
   magic: "rgba(100, 220, 233, 0.78)",
   other: "rgba(168, 183, 206, 0.74)",
 };
+const STATUS_POLL_MS = 15000;
 
 function colorForCategory(category) {
   return CATEGORY_COLORS[category] || "rgba(168, 183, 206, 0.74)";
@@ -26,6 +27,58 @@ function categorySort(categories) {
     if (ra !== rb) return ra - rb;
     return a.localeCompare(b);
   });
+}
+
+function setText(id, value) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = value;
+}
+
+function renderIngestStatus(status) {
+  setText("statusEnabled", status.enabled ? "enabled" : "disabled");
+  setText("statusRunning", status.running ? "running" : "idle");
+  setText("statusLastSuccess", status.last_success_utc || "n/a");
+  setText(
+    "statusLastParsed",
+    status.last_parsed_events === null || status.last_parsed_events === undefined
+      ? "n/a"
+      : String(status.last_parsed_events)
+  );
+  setText("statusLastError", status.last_error || "none");
+}
+
+async function fetchIngestStatus() {
+  const resp = await fetch("/api/status", { cache: "no-store" });
+  if (!resp.ok) return null;
+  return resp.json();
+}
+
+async function watchForLiveUpdates() {
+  let knownLastSuccess = (document.body.dataset.lastSuccess || "").trim();
+
+  while (true) {
+    try {
+      const status = await fetchIngestStatus();
+      if (status) {
+        renderIngestStatus(status);
+
+        const latestSuccess = (status.last_success_utc || "").trim();
+        if (latestSuccess && latestSuccess !== knownLastSuccess) {
+          window.location.reload();
+          return;
+        }
+
+        if (latestSuccess) {
+          knownLastSuccess = latestSuccess;
+        }
+      }
+    } catch (_err) {
+      // Keep polling even if one request fails.
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, STATUS_POLL_MS));
+  }
 }
 
 async function loadMomentumChart() {
@@ -178,6 +231,7 @@ async function loadLandSwingChart() {
 
 async function bootstrap() {
   await Promise.all([loadMomentumChart(), loadLandSwingChart()]);
+  watchForLiveUpdates();
 }
 
 bootstrap();

@@ -1,4 +1,5 @@
 import argparse
+import os
 import re
 import threading
 import time
@@ -18,7 +19,7 @@ DEFAULT_POLL_SECONDS = 300
 STATE_LOCK = threading.Lock()
 STOP_EVENT = threading.Event()
 INGEST_STATE: Dict[str, Any] = {
-    "enabled": True,
+    "enabled": False,
     "running": False,
     "iterations": 0,
     "last_started_utc": None,
@@ -27,6 +28,8 @@ INGEST_STATE: Dict[str, Any] = {
     "last_parsed_events": None,
     "last_error": None,
 }
+INGEST_THREAD: Optional[threading.Thread] = None
+INGEST_THREAD_LOCK = threading.Lock()
 
 MONTH_INDEX = {
     "January": 1,
@@ -124,6 +127,16 @@ def update_ingest_state(**kwargs: Any) -> None:
 def snapshot_ingest_state() -> Dict[str, Any]:
     with STATE_LOCK:
         return dict(INGEST_STATE)
+
+
+def env_truthy(value: str | None, default: bool = False) -> bool:
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def default_config_path() -> str:
+    return os.getenv("UTOPIA_CONFIG_PATH", "config.json")
 
 
 def run_ingest_cycle(config_path: str) -> int:
@@ -817,9 +830,16 @@ def build_latest_feed(limit: int = 80) -> list[Dict[str, Any]]:
 
 
 def ingest_loop(config_path: str, stop_event: threading.Event) -> None:
-    cfg = load_config(config_path)
+    try:
+        cfg = load_config(config_path)
+    except Exception as exc:  # pragma: no cover
+        update_ingest_state(enabled=True, running=False, last_error=f"Config error: {exc}")
+        print(f"[app] Background ingest config ERROR: {exc}")
+        return
+
     poll_seconds = int(cfg.get("poll_seconds", DEFAULT_POLL_SECONDS))
-    print(f"[app] Background ingest loop started (poll_seconds={poll_seconds})")
+    update_ingest_state(enabled=True, last_error=None)
+    print(f"[app] Background ingest loop started (poll_seconds={poll_seconds}, config={config_path})")
 
     while not stop_event.is_set():
         started = time.time()
@@ -849,6 +869,37 @@ def ingest_loop(config_path: str, stop_event: threading.Event) -> None:
             break
 
     print("[app] Background ingest loop stopped")
+
+
+def start_ingest_thread(config_path: str) -> bool:
+    global INGEST_THREAD
+
+    with INGEST_THREAD_LOCK:
+        if INGEST_THREAD and INGEST_THREAD.is_alive():
+            return False
+
+        init_db()
+        STOP_EVENT.clear()
+        INGEST_THREAD = threading.Thread(
+            target=ingest_loop,
+            args=(config_path, STOP_EVENT),
+            name="ingest-worker",
+            daemon=True,
+        )
+        INGEST_THREAD.start()
+        return True
+
+
+def maybe_start_ingest_for_wsgi() -> None:
+    enabled = env_truthy(os.getenv("UTOPIA_ENABLE_INGEST"), default=False)
+    if not enabled:
+        update_ingest_state(enabled=False)
+        return
+
+    config_path = default_config_path()
+    started = start_ingest_thread(config_path)
+    if started:
+        print(f"[app] WSGI ingest thread started using config={config_path}")
 
 
 @app.route("/")
@@ -910,9 +961,12 @@ def healthz():
     return jsonify({"ok": True, "utc": utc_now_iso()})
 
 
+maybe_start_ingest_for_wsgi()
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", default="config.json")
+    parser.add_argument("--config", default=default_config_path())
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=5055)
     parser.add_argument("--debug", action="store_true")
@@ -925,13 +979,7 @@ if __name__ == "__main__":
         update_ingest_state(enabled=False)
         print("[app] Background ingest disabled (--no-ingest)")
     else:
-        worker = threading.Thread(
-            target=ingest_loop,
-            args=(args.config, STOP_EVENT),
-            name="ingest-worker",
-            daemon=True,
-        )
-        worker.start()
+        start_ingest_thread(args.config)
 
     try:
         app.run(

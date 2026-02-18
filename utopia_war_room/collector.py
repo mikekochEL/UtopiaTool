@@ -1,6 +1,7 @@
 import argparse
 import hashlib
 import json
+import os
 import time
 from collections import deque
 from datetime import datetime, timezone
@@ -21,10 +22,81 @@ def sha256_text(s: str) -> str:
     return hashlib.sha256(s.encode("utf-8", errors="ignore")).hexdigest()
 
 
-def load_config(path: str = "config.json") -> Dict[str, Any]:
-    # utf-8-sig accepts plain UTF-8 and UTF-8 with BOM.
+def env_truthy(value: str | None, default: bool = False) -> bool:
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def load_json_file(path: str) -> Dict[str, Any]:
     with open(path, "r", encoding="utf-8-sig") as f:
         return json.load(f)
+
+
+def load_config(path: str = "config.json") -> Dict[str, Any]:
+    """
+    Load config from file when present, then allow env vars to override.
+
+    Render-friendly env vars:
+    - UTOPIA_BASE_URL
+    - UTOPIA_WORLD
+    - UTOPIA_KINGDOM_NEWS_PATH
+    - UTOPIA_CRAWL
+    - UTOPIA_MAX_PAGES
+    - UTOPIA_POLL_SECONDS
+    - UTOPIA_COOKIES_JSON
+    - UTOPIA_SESSIONID (+ UTOPIA_SESSION_COOKIE_NAME)
+    """
+    file_cfg: Dict[str, Any] = {}
+    if path and os.path.exists(path):
+        file_cfg = load_json_file(path)
+
+    base_url = os.getenv("UTOPIA_BASE_URL", file_cfg.get("base_url", "https://utopia-game.com"))
+    world = os.getenv("UTOPIA_WORLD", file_cfg.get("world", "wol"))
+
+    file_pages = file_cfg.get("pages", {})
+    file_news = file_pages.get("kingdom_news", {})
+    if isinstance(file_news, str):
+        file_news_path = file_news
+        file_news_crawl = True
+        file_news_max = 12
+    else:
+        file_news_path = file_news.get("path", f"/{world}/game/kingdom_news")
+        file_news_crawl = bool(file_news.get("crawl", True))
+        file_news_max = int(file_news.get("max_pages", 12))
+
+    news_path = os.getenv("UTOPIA_KINGDOM_NEWS_PATH", file_news_path)
+    news_crawl = env_truthy(os.getenv("UTOPIA_CRAWL"), default=file_news_crawl)
+    news_max_pages = int(os.getenv("UTOPIA_MAX_PAGES", str(file_news_max)))
+    poll_seconds = int(os.getenv("UTOPIA_POLL_SECONDS", str(file_cfg.get("poll_seconds", 300))))
+
+    cookies: Dict[str, str] = {}
+    cookies.update(file_cfg.get("cookies", {}))
+
+    cookies_json = os.getenv("UTOPIA_COOKIES_JSON")
+    if cookies_json:
+        parsed = json.loads(cookies_json)
+        if isinstance(parsed, dict):
+            cookies.update({str(k): str(v) for k, v in parsed.items()})
+
+    sessionid = os.getenv("UTOPIA_SESSIONID")
+    if sessionid:
+        cookie_name = os.getenv("UTOPIA_SESSION_COOKIE_NAME", "sessionid")
+        cookies[cookie_name] = sessionid
+
+    return {
+        "base_url": base_url,
+        "world": world,
+        "pages": {
+            "kingdom_news": {
+                "path": news_path,
+                "crawl": news_crawl,
+                "max_pages": max(1, news_max_pages),
+            }
+        },
+        "cookies": cookies,
+        "poll_seconds": max(15, poll_seconds),
+    }
 
 
 def build_url(base_url: str, path_or_url: str) -> str:
@@ -155,6 +227,11 @@ def run_once(config_path: str = "config.json") -> None:
     base_url = cfg["base_url"]
     pages = cfg["pages"]
     cookies = cfg.get("cookies", {})
+
+    if not cookies:
+        raise ValueError(
+            "No session cookies configured. Set UTOPIA_SESSIONID (or cookies in config.json)."
+        )
 
     init_db()
 

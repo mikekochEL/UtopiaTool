@@ -284,7 +284,7 @@
     }
   </style>
 </head>
-<body>
+<body data-last-success="{{ ingest['last_success_utc'] or '' }}">
   <div class="wrap">
     <section class="hero">
       <div>
@@ -294,10 +294,17 @@
           | Run mode: <code>python app.py</code>
         </p>
       </div>
-      <div class="statusline">
-        <div>Ingest: <strong>{{ "enabled" if ingest["enabled"] else "disabled" }}</strong> | State: <strong>{{ "running" if ingest["running"] else "idle" }}</strong></div>
-        <div>Last success: <strong>{{ ingest["last_success_utc"] or "n/a" }}</strong> | Last parsed: <strong>{{ ingest["last_parsed_events"] if ingest["last_parsed_events"] is not none else "n/a" }}</strong></div>
-        <div>Last error: <strong>{{ ingest["last_error"] or "none" }}</strong></div>
+      <div class="statusline" id="ingestStatus">
+        <div>
+          Ingest: <strong id="statusEnabled">{{ "enabled" if ingest["enabled"] else "disabled" }}</strong>
+          | State: <strong id="statusRunning">{{ "running" if ingest["running"] else "idle" }}</strong>
+        </div>
+        <div>
+          Last success: <strong id="statusLastSuccess">{{ ingest["last_success_utc"] or "n/a" }}</strong>
+          | Last parsed: <strong id="statusLastParsed">{{ ingest["last_parsed_events"] if ingest["last_parsed_events"] is not none else "n/a" }}</strong>
+        </div>
+        <div>Last error: <strong id="statusLastError">{{ ingest["last_error"] or "none" }}</strong></div>
+        <div>Auto refresh: <strong>on</strong></div>
       </div>
     </section>
 
