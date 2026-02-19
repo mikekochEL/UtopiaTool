@@ -1,61 +1,80 @@
-# Deploy to Render (Live Updating)
+# Cloudflare Tunnel Deploy
 
-Use a `Web Service` on Render.
+This project now uses a local Flask app + Cloudflare Tunnel for public access.
 
-## Canonical Settings
+## 1) Run the app locally
 
-- `Root Directory`: `utopia_war_room`
-- `Build Command`: `pip install -r requirements.txt`
-- `Start Command`: `gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120 --access-logfile -`
-- `Health Check Path`: `/healthz`
+From `utopia_war_room`:
 
-## Environment Variables
+```powershell
+$env:UTOPIA_ENABLE_INGEST="1"
+$env:UTOPIA_SESSIONID="<your utopia session cookie>"
+python app.py --host 127.0.0.1 --port 5055
+```
 
-Required:
+Optional:
 
-- `UTOPIA_ENABLE_INGEST` = `1`
-- `UTOPIA_DB_PATH` = `/data/utopia.db`
-- `UTOPIA_SESSIONID` = `<your current utopia session cookie>`
+```powershell
+$env:UTOPIA_CONFIG_PATH="config.json"
+$env:UTOPIA_POLL_SECONDS="300"
+```
 
-Recommended:
+## 2) Install cloudflared (Windows)
 
-- `UTOPIA_SESSION_COOKIE_NAME` = `sessionid`
-- `UTOPIA_BASE_URL` = `https://utopia-game.com`
-- `UTOPIA_WORLD` = `wol`
-- `UTOPIA_KINGDOM_NEWS_PATH` = `/wol/game/kingdom_news`
-- `UTOPIA_CRAWL` = `true`
-- `UTOPIA_MAX_PAGES` = `12`
-- `UTOPIA_ENABLE_INTEL_OPS` = `1` (optional)
-- `UTOPIA_INTEL_OPS_URL` = `https://intel.utopia-game.com/` (optional)
-- `UTOPIA_POLL_SECONDS` = `300`
+Pick one:
 
-## Persistent Storage
+```powershell
+winget install Cloudflare.cloudflared
+```
 
-Add a disk:
+or
 
-- `Mount Path`: `/data`
-- `Size`: `1 GB` (or higher)
+```powershell
+choco install cloudflared
+```
 
-Without a persistent disk, DB data resets on restart.
+## 3) Start a quick public tunnel
 
-## Plan
+```powershell
+cloudflared tunnel --url http://127.0.0.1:5055
+```
 
-Use `Starter` (or higher) for reliable always-on ingest and persistent disk.
-Free plan sleeps and has no persistent disk support.
+Cloudflare prints a public `https://...trycloudflare.com` URL you can share.
 
-## What "Good" Looks Like in Logs
+## 4) Stable domain (recommended)
 
-You should see:
+Use a named tunnel and DNS route so the URL is permanent:
 
-- `[app] WSGI ingest thread started ...`
-- `[collector] ... status=200 ...`
-- `[parser] fetches=... extracted=...`
+```powershell
+cloudflared tunnel login
+cloudflared tunnel create utopia-war-room
+cloudflared tunnel route dns utopia-war-room war.yourdomain.com
+```
 
-## If You Leave Root Directory Blank
+Create `config.yml`:
 
-Use this alternate pair instead:
+```yaml
+tunnel: <TUNNEL_UUID>
+credentials-file: C:\Users\<you>\.cloudflared\<TUNNEL_UUID>.json
+ingress:
+  - hostname: war.yourdomain.com
+    service: http://127.0.0.1:5055
+  - service: http_status:404
+```
 
-- Build: `pip install -r utopia_war_room/requirements.txt`
-- Start: `gunicorn app:app --chdir utopia_war_room --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120 --access-logfile -`
+Run:
 
-Do not mix both patterns.
+```powershell
+cloudflared tunnel run utopia-war-room
+```
+
+## 5) Keep it running
+
+- Use Task Scheduler or NSSM to run both `python app.py` and `cloudflared tunnel run ...` at startup.
+- Keep `UTOPIA_SESSIONID` fresh; ingestion stops when the cookie expires.
+
+## Quick checks
+
+- App health: `http://127.0.0.1:5055/healthz`
+- Ingest status: `http://127.0.0.1:5055/api/status`
+- Public page: your Cloudflare URL

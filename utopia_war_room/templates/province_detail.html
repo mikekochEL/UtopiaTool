@@ -1,0 +1,141 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Province Detail - {{ detail["province"] }}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg-top:#112033;--bg-bottom:#060b14;--panel:rgba(16,35,60,.82);--panel-soft:rgba(22,45,74,.76);--border:rgba(168,199,255,.25);--text:#e9f1ff;--muted:#9ab1ce;--accent:#53b1ff;--gain:#33c77f;--loss:#ff7474;--warn:#ffc857}
+    *{box-sizing:border-box}
+    body{margin:0;color:var(--text);background:radial-gradient(1200px 480px at 8% -10%,#2a4771 0%,transparent 60%),radial-gradient(800px 400px at 95% 0%,#294163 0%,transparent 58%),linear-gradient(180deg,var(--bg-top),var(--bg-bottom));font-family:"Space Grotesk","Segoe UI",sans-serif;min-height:100vh;overflow-x:hidden}
+    .wrap{width:min(1500px,100%);margin:0 auto;padding:16px 12px 26px}
+    .hero{display:flex;justify-content:space-between;gap:10px;align-items:flex-end;flex-wrap:wrap}
+    h1{margin:0;font-size:30px}
+    .subtitle{margin:6px 0 0;color:var(--muted);font-size:13px}
+    .row{display:flex;gap:8px;flex-wrap:wrap}
+    .btn{display:inline-block;padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:rgba(27,58,95,.88);color:var(--text);font-size:12px;text-decoration:none}
+    .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:9px;margin-top:10px}
+    .kpi{padding:10px;border:1px solid var(--border);border-radius:12px;background:linear-gradient(180deg,rgba(84,129,191,.18),rgba(15,36,62,.92))}
+    .kpi .label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+    .kpi .value{margin-top:4px;font-size:22px;font-weight:700}
+    .kpi .sub{font-size:11px;color:var(--muted)}
+    .gain{color:var(--gain)}.loss{color:var(--loss)}
+    .card{margin-top:10px;padding:11px;border:1px solid var(--border);border-radius:12px;background:var(--panel);box-shadow:0 8px 22px rgba(2,7,16,.2);backdrop-filter:blur(6px)}
+    .card h3{margin:0 0 8px;font-size:16px}
+    .hint{margin:0 0 8px;color:var(--muted);font-size:12px}
+    .table-wrap{max-width:100%;overflow-x:auto;overflow-y:hidden}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    th,td{padding:6px 7px;border-bottom:1px solid rgba(159,186,223,.18);white-space:nowrap;text-align:left}
+    th{font-size:11px;color:#c5dcff;text-transform:uppercase;letter-spacing:.6px;cursor:pointer}
+    th.sorted-asc::after{content:" ^";color:var(--accent)}th.sorted-desc::after{content:" v";color:var(--accent)}
+    td.summary{white-space:normal;min-width:260px;max-width:520px;overflow-wrap:anywhere}
+    .pill{display:inline-block;padding:2px 7px;border-radius:999px;font-size:11px;text-transform:uppercase;border:1px solid rgba(180,205,238,.28)}
+    .pill.hostile{color:#ffd7d7;border-color:rgba(255,116,116,.55);background:rgba(118,47,47,.35)}
+    .pill.intel{color:#d3ecff;border-color:rgba(83,177,255,.55);background:rgba(39,81,124,.38)}
+    .pill.support{color:#cbffdf;border-color:rgba(80,204,128,.5);background:rgba(38,112,68,.38)}
+    .pill.true{color:#ffeec2;border-color:rgba(255,200,87,.55);background:rgba(124,100,38,.35)}
+    .pill.false{color:#dde8f9;border-color:rgba(173,193,225,.45);background:rgba(72,87,109,.4)}
+    .inline-link{background:transparent;border:0;color:var(--accent);text-decoration:underline;text-decoration-style:dotted;cursor:pointer;padding:0;font:inherit}
+    @media (max-width:980px){h1{font-size:24px}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <div>
+        <h1>{{ detail["province"] }}{% if detail["kingdom"] %} ({{ detail["kingdom"] }}){% endif %}</h1>
+        <p class="subtitle">
+          Scope: <strong>{{ selected_war_label }}</strong>
+          {% if selected_start_day or selected_end_day %}| UTC: <strong>{{ selected_start_day or "..." }} -> {{ selected_end_day or "..." }}</strong>{% endif %}
+          | Home KD: <strong>{{ home_kingdom or "unknown" }}</strong>
+        </p>
+      </div>
+      <div class="row">
+        <a class="btn" href="{{ dashboard_href }}">Back to Dashboard</a>
+        <a class="btn" href="{{ ops_summary_href }}">Ops Summary</a>
+      </div>
+    </section>
+
+    <section class="kpis">
+      <div class="kpi"><div class="label">Ops Sent / Received</div><div class="value">{{ detail["stats"]["ops_sent"] }} / {{ detail["stats"]["ops_received"] }}</div><div class="sub">hostile {{ detail["stats"]["hostile_ops_sent"] }} / {{ detail["stats"]["hostile_ops_received"] }}</div></div>
+      <div class="kpi"><div class="label">Op Damage Done</div><div class="value gain">{{ detail["stats"]["op_damage_done"] }}</div><div class="sub">war {{ detail["stats"]["war_op_damage_done"] }}</div></div>
+      <div class="kpi"><div class="label">Op Damage Taken</div><div class="value loss">{{ detail["stats"]["op_damage_taken"] }}</div><div class="sub">war {{ detail["stats"]["war_op_damage_taken"] }}</div></div>
+      <div class="kpi"><div class="label">Op Net Damage</div><div class="value {{ 'gain' if detail['stats']['op_net_damage'] >= 0 else 'loss' }}">{{ detail["stats"]["op_net_damage"] }}</div><div class="sub">war {{ detail["stats"]["war_op_net_damage"] }}</div></div>
+      <div class="kpi"><div class="label">Op Gains Done / Taken</div><div class="value">{{ detail["stats"]["op_gain_done"] }} / {{ detail["stats"]["op_gain_taken"] }}</div><div class="sub">war {{ detail["stats"]["war_op_gain_done"] }} / {{ detail["stats"]["war_op_gain_taken"] }}</div></div>
+      <div class="kpi"><div class="label">War Ops</div><div class="value">{{ detail["stats"]["war_ops_sent"] }} / {{ detail["stats"]["war_ops_received"] }}</div><div class="sub">hostile {{ detail["stats"]["war_hostile_ops_sent"] }} / {{ detail["stats"]["war_hostile_ops_received"] }}</div></div>
+      <div class="kpi"><div class="label">Magic Sent / Received</div><div class="value">{{ detail["stats"]["magic_sent"] }} / {{ detail["stats"]["magic_received"] }}</div><div class="sub">Thievery {{ detail["stats"]["thievery_sent"] }} / {{ detail["stats"]["thievery_received"] }}</div></div>
+      <div class="kpi"><div class="label">Attack Land Net</div><div class="value {{ 'gain' if detail['stats']['net'] >= 0 else 'loss' }}">{{ detail["stats"]["net"] }}</div><div class="sub">gains {{ detail["stats"]["gains"] }} / losses {{ detail["stats"]["losses"] }}</div></div>
+    </section>
+
+    <section class="card">
+      <h3>Operation Breakdown</h3>
+      <p class="hint">Damage and gain values come directly from intel site fields when available. Missing values are treated as 0.</p>
+      <div class="table-wrap">
+        <table class="sortable">
+          <tr>
+            <th>Op</th><th>Kind</th><th>Sent</th><th>Recv</th><th>Sent S/P/F/U</th><th>Recv S/P/F/U</th>
+            <th>Damage Done</th><th>Damage Taken</th><th>Net</th><th>Gain Done</th><th>Gain Taken</th>
+            <th>War Sent</th><th>War Recv</th><th>War Dmg Done</th><th>War Dmg Taken</th><th>War Net</th>
+          </tr>
+          {% for row in detail["op_breakdown_rows"] %}
+          <tr>
+            <td>{{ row["op_name"] }}</td>
+            <td><span class="pill {{ row['op_kind'] }}">{{ row["op_kind"] }}</span></td>
+            <td>{{ row["sent"] }}</td>
+            <td>{{ row["received"] }}</td>
+            <td>{{ row["sent_success"] }}/{{ row["sent_partial"] }}/{{ row["sent_failed"] }}/{{ row["sent_unknown"] }}</td>
+            <td>{{ row["received_success"] }}/{{ row["received_partial"] }}/{{ row["received_failed"] }}/{{ row["received_unknown"] }}</td>
+            <td class="gain">{{ row["damage_done"] }}</td>
+            <td class="loss">{{ row["damage_taken"] }}</td>
+            <td class="{{ 'gain' if row['net_damage'] >= 0 else 'loss' }}">{{ row["net_damage"] }}</td>
+            <td class="gain">{{ row["gain_done"] }}</td>
+            <td class="loss">{{ row["gain_taken"] }}</td>
+            <td>{{ row["war_sent"] }}</td>
+            <td>{{ row["war_received"] }}</td>
+            <td class="gain">{{ row["war_damage_done"] }}</td>
+            <td class="loss">{{ row["war_damage_taken"] }}</td>
+            <td class="{{ 'gain' if row['war_net_damage'] >= 0 else 'loss' }}">{{ row["war_net_damage"] }}</td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+    </section>
+
+    <section class="card">
+      <h3>Province Event Timeline</h3>
+      <p class="hint">Includes attack, aid, thievery, and magic events for this province in the current scope.</p>
+      <div class="table-wrap">
+        <table class="sortable">
+          <tr>
+            <th>Fetched</th><th>Day</th><th>Category</th><th>Op</th><th>Kind</th><th>Role</th><th>Outcome</th>
+            <th>Damage</th><th>Gain</th><th>Duration</th><th>War</th><th>Actor</th><th>Target</th><th>Summary</th>
+          </tr>
+          {% for row in detail["events"] %}
+          <tr>
+            <td>{{ row["fetched_at_utc"] }}</td>
+            <td>{{ row["event_time_text"] }}</td>
+            <td>{{ row["category"] }}</td>
+            <td>{{ row["operation_name"] if row["operation_name"] != "-" else row["attack_type"] }}</td>
+            <td>{% if row["operation_kind"] != "-" %}<span class="pill {{ row['operation_kind'] }}">{{ row["operation_kind"] }}</span>{% else %}-{% endif %}</td>
+            <td>{{ row["role"] }}</td>
+            <td>{{ row["outcome"] }}</td>
+            <td>{{ row["op_damage"] if row["op_damage"] else "-" }}</td>
+            <td>{{ row["op_gain"] if row["op_gain"] else "-" }}</td>
+            <td>{{ row["op_duration_ticks"] if row["op_duration_ticks"] else "-" }}</td>
+            <td><span class="pill {{ row['war_context']|string|lower }}">{{ "war" if row["war_context"] else "no" }}</span></td>
+            <td>{% if row["actor"] != "-" %}<button class="inline-link province-link" type="button" data-province="{{ row['actor'] }}">{{ row["actor"] }}</button>{% else %}-{% endif %}</td>
+            <td>{% if row["target"] != "-" %}<button class="inline-link province-link" type="button" data-province="{{ row['target'] }}">{{ row["target"] }}</button>{% else %}-{% endif %}</td>
+            <td class="summary">{{ row["summary"] }}</td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <script src="/static/province_detail.js"></script>
+</body>
+</html>

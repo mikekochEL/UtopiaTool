@@ -8,778 +8,282 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
-    :root {
-      --bg-top: #112033;
-      --bg-bottom: #060b14;
-      --panel: rgba(16, 35, 60, 0.82);
-      --panel-soft: rgba(22, 45, 74, 0.76);
-      --border: rgba(168, 199, 255, 0.25);
-      --text: #e9f1ff;
-      --muted: #9ab1ce;
-      --accent: #53b1ff;
-      --gain: #33c77f;
-      --loss: #ff7474;
-      --warn: #ffc857;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      margin: 0;
-      color: var(--text);
-      background: radial-gradient(1200px 480px at 8% -10%, #2a4771 0%, transparent 60%),
-                  radial-gradient(800px 400px at 95% 0%, #294163 0%, transparent 58%),
-                  linear-gradient(180deg, var(--bg-top), var(--bg-bottom));
-      font-family: "Space Grotesk", "Segoe UI", sans-serif;
-      min-height: 100vh;
-    }
-
-    .wrap {
-      width: min(1500px, 100%);
-      margin: 0 auto;
-      padding: 24px 16px 28px;
-    }
-
-    .hero {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-end;
-      flex-wrap: wrap;
-      gap: 14px;
-      margin-bottom: 14px;
-    }
-
-    h1 {
-      margin: 0;
-      font-size: 34px;
-      letter-spacing: 0.3px;
-      font-weight: 700;
-    }
-
-    .subtitle {
-      color: var(--muted);
-      margin: 8px 0 0;
-      font-size: 14px;
-    }
-
-    .statusline {
-      color: var(--muted);
-      font-size: 13px;
-      text-align: right;
-      line-height: 1.6;
-    }
-
-    .statusline strong {
-      color: var(--text);
-      font-weight: 600;
-    }
-
-    .kpis {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 10px;
-      margin-top: 12px;
-    }
-
-    .kpi {
-      background: linear-gradient(180deg, rgba(84, 129, 191, 0.18), rgba(15, 36, 62, 0.9));
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 12px;
-      box-shadow: 0 8px 24px rgba(2, 6, 14, 0.25);
-      cursor: pointer;
-    }
-
-    .kpi .label {
-      color: var(--muted);
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.8px;
-    }
-
-    .kpi .value {
-      margin-top: 5px;
-      font-size: 24px;
-      line-height: 1.05;
-      font-weight: 700;
-    }
-
-    .kpi .sub {
-      margin-top: 4px;
-      color: var(--muted);
-      font-size: 12px;
-    }
-
-    .value.gain {
-      color: var(--gain);
-    }
-
-    .value.loss {
-      color: var(--loss);
-    }
-
-    .grid-2 {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 12px;
-      margin-top: 12px;
-    }
-
-    .card {
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 12px;
-      box-shadow: 0 8px 22px rgba(2, 7, 16, 0.2);
-      backdrop-filter: blur(6px);
-    }
-
-    .card h3 {
-      margin: 0 0 8px;
-      font-size: 16px;
-      font-weight: 600;
-      letter-spacing: 0.2px;
-    }
-
-    .card .hint {
-      margin: 0 0 8px;
-      color: var(--muted);
-      font-size: 12px;
-    }
-
-    .table-wrap {
-      overflow-x: auto;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13px;
-    }
-
-    th, td {
-      border-bottom: 1px solid rgba(159, 186, 223, 0.18);
-      padding: 7px 8px;
-      text-align: left;
-      white-space: nowrap;
-    }
-
-    th {
-      color: #c5dcff;
-      font-weight: 600;
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.6px;
-      cursor: pointer;
-      user-select: none;
-    }
-
-    th.sorted-asc::after {
-      content: " ▲";
-      color: var(--accent);
-      font-size: 10px;
-    }
-
-    th.sorted-desc::after {
-      content: " ▼";
-      color: var(--accent);
-      font-size: 10px;
-    }
-
-    td.summary {
-      white-space: normal;
-      min-width: 340px;
-      color: #d2e1f5;
-    }
-
-    .net-pos {
-      color: var(--gain);
-      font-weight: 600;
-    }
-
-    .net-neg {
-      color: var(--loss);
-      font-weight: 600;
-    }
-
-    .pill {
-      display: inline-block;
-      padding: 2px 7px;
-      border-radius: 999px;
-      font-size: 11px;
-      letter-spacing: 0.3px;
-      text-transform: uppercase;
-      border: 1px solid rgba(180, 205, 238, 0.28);
-      color: #d6e6ff;
-    }
-
-    .pill.success {
-      color: #cbffdf;
-      border-color: rgba(80, 204, 128, 0.5);
-      background: rgba(38, 112, 68, 0.38);
-    }
-
-    .pill.failed {
-      color: #ffd7d7;
-      border-color: rgba(255, 116, 116, 0.55);
-      background: rgba(118, 47, 47, 0.35);
-    }
-
-    .pill.victory {
-      color: #cbffdf;
-      border-color: rgba(80, 204, 128, 0.5);
-      background: rgba(38, 112, 68, 0.38);
-    }
-
-    .pill.active {
-      color: #d3ecff;
-      border-color: rgba(83, 177, 255, 0.55);
-      background: rgba(39, 81, 124, 0.38);
-    }
-
-    .pill.peace {
-      color: #ffeec2;
-      border-color: rgba(255, 200, 87, 0.55);
-      background: rgba(124, 100, 38, 0.35);
-    }
-
-    .pill.ended {
-      color: #dde8f9;
-      border-color: rgba(173, 193, 225, 0.45);
-      background: rgba(72, 87, 109, 0.4);
-    }
-
-    .charts {
-      display: grid;
-      grid-template-columns: 2fr 1fr;
-      gap: 12px;
-      margin-top: 12px;
-    }
-
-    .chart-box {
-      height: 340px;
-      position: relative;
-      background: var(--panel-soft);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 8px;
-    }
-
-    .chart-box canvas {
-      width: 100% !important;
-      height: 100% !important;
-    }
-
-    .footer-note {
-      margin-top: 12px;
-      color: var(--muted);
-      font-size: 12px;
-    }
-
-    .war-filter {
-      margin-top: 8px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 13px;
-      color: var(--muted);
-    }
-
-    .war-filter select {
-      background: rgba(20, 41, 67, 0.95);
-      color: var(--text);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 6px 8px;
-      min-width: 340px;
-      max-width: 100%;
-    }
-
-    tr.event-row {
-      cursor: pointer;
-    }
-
-    tr.event-row:hover {
-      background: rgba(83, 177, 255, 0.08);
-    }
-
-    tr.event-row.active {
-      background: rgba(83, 177, 255, 0.15);
-    }
-
-    .detail-grid {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 8px;
-      margin-bottom: 8px;
-      font-size: 12px;
-      color: var(--muted);
-    }
-
-    .detail-summary {
-      margin: 0;
-      white-space: pre-wrap;
-      font-size: 14px;
-      color: var(--text);
-      line-height: 1.5;
-    }
-
-    .inline-link {
-      background: transparent;
-      border: 0;
-      color: var(--accent);
-      padding: 0;
-      font: inherit;
-      cursor: pointer;
-      text-decoration: underline;
-      text-decoration-style: dotted;
-    }
-
-    .inline-link:hover {
-      color: #84c9ff;
-    }
-
-    .fact-rows div {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      border-bottom: 1px solid rgba(159, 186, 223, 0.15);
-      padding: 6px 0;
-      font-size: 13px;
-    }
-
-    .fact-events {
-      margin-top: 8px;
-      max-height: 260px;
-      overflow-y: auto;
-      display: grid;
-      gap: 6px;
-    }
-
-    .fact-events .event {
-      font-size: 12px;
-      color: #d7e6fb;
-      border: 1px solid rgba(159, 186, 223, 0.2);
-      border-radius: 8px;
-      padding: 7px 8px;
-      background: rgba(20, 41, 67, 0.45);
-    }
-
-    @media (max-width: 1220px) {
-      .charts {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    @media (max-width: 980px) {
-      .grid-2 {
-        grid-template-columns: 1fr;
-      }
-
-      .statusline {
-        text-align: left;
-      }
-
-      h1 {
-        font-size: 28px;
-      }
-    }
+    :root{--bg-top:#112033;--bg-bottom:#060b14;--panel:rgba(16,35,60,.82);--panel-soft:rgba(22,45,74,.76);--border:rgba(168,199,255,.25);--text:#e9f1ff;--muted:#9ab1ce;--accent:#53b1ff;--gain:#33c77f;--loss:#ff7474;--warn:#ffc857}
+    *{box-sizing:border-box}
+    body{margin:0;color:var(--text);background:radial-gradient(1200px 480px at 8% -10%,#2a4771 0%,transparent 60%),radial-gradient(800px 400px at 95% 0%,#294163 0%,transparent 58%),linear-gradient(180deg,var(--bg-top),var(--bg-bottom));font-family:"Space Grotesk","Segoe UI",sans-serif;min-height:100vh;overflow-x:hidden}
+    .wrap{width:min(1500px,100%);margin:0 auto;padding:16px 12px 26px}
+    .hero{display:flex;justify-content:space-between;gap:10px;align-items:flex-end;flex-wrap:wrap}
+    h1{margin:0;font-size:32px}
+    .subtitle{margin:6px 0 0;color:var(--muted);font-size:13px}
+    .statusline{font-size:12px;color:var(--muted);text-align:right;line-height:1.6}.statusline strong{color:var(--text)}
+    .control{position:sticky;top:8px;z-index:20;margin-top:10px;padding:10px;border:1px solid var(--border);border-radius:12px;background:rgba(13,31,53,.92);backdrop-filter:blur(8px)}
+    .control-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;align-items:end}
+    .field{display:grid;gap:4px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+    .field input,.field select{width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:rgba(20,41,67,.95);color:var(--text);font-size:13px;text-transform:none;letter-spacing:0}
+    .actions{display:flex;gap:6px;flex-wrap:wrap}
+    .btn{padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:rgba(27,58,95,.88);color:var(--text);font-size:12px;cursor:pointer}
+    .tabs{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+    .tab{padding:5px 10px;border:1px solid var(--border);border-radius:999px;background:rgba(21,45,73,.7);color:var(--muted);font-size:12px;cursor:pointer}
+    .tab.active{border-color:rgba(83,177,255,.75);background:rgba(39,81,124,.55);color:var(--text)}
+    .alerts{margin-top:8px;display:grid;gap:6px}
+    .alert{border:1px solid rgba(255,200,87,.45);background:rgba(86,65,24,.35);padding:8px 10px;border-radius:8px;color:#ffe7b2;font-size:12px}
+    .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:9px;margin-top:10px}
+    .kpi{padding:10px;border:1px solid var(--border);border-radius:12px;background:linear-gradient(180deg,rgba(84,129,191,.18),rgba(15,36,62,.92));cursor:pointer}
+    .kpi .label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+    .kpi .value{margin-top:4px;font-size:22px;font-weight:700}
+    .kpi .sub{font-size:11px;color:var(--muted)}
+    .gain{color:var(--gain)}.loss{color:var(--loss)}
+    .card{margin-top:10px;padding:11px;border:1px solid var(--border);border-radius:12px;background:var(--panel);box-shadow:0 8px 22px rgba(2,7,16,.2);backdrop-filter:blur(6px);transition:border-color .25s,box-shadow .25s,transform .25s,opacity .25s}
+    .card.loading{opacity:.72;transform:translateY(6px)}.card.spotlight{border-color:rgba(83,177,255,.8);box-shadow:0 0 0 1px rgba(83,177,255,.35),0 16px 30px rgba(6,22,42,.5)}
+    .card h3{margin:0 0 8px;font-size:16px}.hint{margin:0 0 8px;color:var(--muted);font-size:12px}
+    .grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .snapshot-grid{display:grid;grid-template-columns:1.5fr 1fr;gap:10px}
+    .charts-main{display:grid;grid-template-columns:1.2fr 1.2fr 1fr;gap:10px}
+    .inspector{display:grid;grid-template-columns:2fr 1fr;gap:10px;align-items:start}
+    .side{display:grid;gap:10px;position:sticky;top:94px}
+    .grid-2>*,.snapshot-grid>*,.charts>*,.inspector>*,.side>*,.card,.field,.actions{min-width:0}
+    .table-wrap{max-width:100%;overflow-x:auto;overflow-y:hidden}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    th,td{padding:6px 7px;border-bottom:1px solid rgba(159,186,223,.18);white-space:nowrap;text-align:left}
+    th{font-size:11px;color:#c5dcff;text-transform:uppercase;letter-spacing:.6px;cursor:pointer}
+    th.sorted-asc::after{content:" ^";color:var(--accent)}th.sorted-desc::after{content:" v";color:var(--accent)}
+    td.summary{white-space:normal;min-width:220px;max-width:540px;overflow-wrap:anywhere}
+    .inline-link{background:transparent;border:0;color:var(--accent);text-decoration:underline;text-decoration-style:dotted;cursor:pointer;padding:0;font:inherit}
+    tr.event-row{cursor:pointer}tr.event-row:hover{background:rgba(83,177,255,.08)}tr.event-row.active{background:rgba(83,177,255,.15)}
+    .pill{display:inline-block;padding:2px 7px;border-radius:999px;font-size:11px;text-transform:uppercase;border:1px solid rgba(180,205,238,.28)}
+    .pill.success,.pill.victory{color:#cbffdf;border-color:rgba(80,204,128,.5);background:rgba(38,112,68,.38)}
+    .pill.failed{color:#ffd7d7;border-color:rgba(255,116,116,.55);background:rgba(118,47,47,.35)}
+    .pill.active{color:#d3ecff;border-color:rgba(83,177,255,.55);background:rgba(39,81,124,.38)}
+    .pill.peace{color:#ffeec2;border-color:rgba(255,200,87,.55);background:rgba(124,100,38,.35)}
+    .pill.ended{color:#dde8f9;border-color:rgba(173,193,225,.45);background:rgba(72,87,109,.4)}
+    .chart{height:300px;position:relative;padding:7px;border:1px solid var(--border);border-radius:10px;background:var(--panel-soft)}
+    .chart.chart-xl{height:420px}
+    .chart canvas{width:100%!important;height:100%!important}
+    .detail-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;color:var(--muted);font-size:12px}
+    .detail-summary{margin:0;white-space:pre-wrap;font-size:14px;line-height:1.45}
+    .fact-rows div{display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid rgba(159,186,223,.15)}
+    .fact-events{display:grid;gap:6px;max-height:230px;overflow-y:auto}
+    .fact-events .event{padding:7px;border:1px solid rgba(159,186,223,.2);border-radius:8px;background:rgba(20,41,67,.45);font-size:12px}
+    .replay-panel{display:grid;gap:8px}
+    .replay-range{display:flex;gap:8px;align-items:center}
+    .replay-range input[type="range"]{width:100%}
+    .replay-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+    .replay-metrics .cell{padding:8px;border:1px solid rgba(159,186,223,.2);border-radius:8px;background:rgba(20,41,67,.45);font-size:12px;color:var(--muted)}
+    .replay-metrics strong{display:block;margin-top:2px;color:var(--text);font-size:16px;line-height:1.2}
+    .hidden{display:none!important}
+    #toastStack{position:fixed;right:12px;bottom:12px;width:min(360px,calc(100% - 24px));display:grid;gap:8px;z-index:999;pointer-events:none}
+    .toast{padding:10px;border:1px solid rgba(83,177,255,.5);border-radius:8px;background:rgba(16,38,64,.95);font-size:12px}
+    @media (max-width:1500px){.inspector{grid-template-columns:1fr}.side{position:static;top:auto}}
+    @media (max-width:1260px){.control-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.snapshot-grid,.charts-main,.inspector{grid-template-columns:1fr}.side{position:static}}
+    @media (max-width:980px){.grid-2{grid-template-columns:1fr}.control-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.statusline{text-align:left}.replay-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
   </style>
 </head>
-<body data-last-success="{{ ingest['last_success_utc'] or '' }}">
+<body data-last-success="{{ ingest['last_success_utc'] or '' }}" data-selected-view="{{ analytics['selected_view'] }}">
   <div class="wrap">
     <section class="hero">
       <div>
         <h1>Utopia War Room</h1>
-        <p class="subtitle">
-          Home kingdom inference: <strong>{{ analytics["home_kingdom"] or "unknown" }}</strong>
-          | Scope: <strong>{{ analytics["selected_war_label"] }}</strong>
-          | Run mode: <code>python app.py</code>
-        </p>
-        <form class="war-filter">
-          <label for="warSelect">War Filter</label>
-          <select id="warSelect" name="war">
-            <option value="all" {% if analytics["selected_war_id"] == "all" %}selected{% endif %}>All events</option>
-            {% for row in analytics["war_rows"] %}
-              <option value="{{ row['war_id'] }}" {% if analytics["selected_war_id"] == row["war_id"] %}selected{% endif %}>
-                {{ row["war_label"] }}
-              </option>
-            {% endfor %}
-          </select>
-        </form>
+        <p class="subtitle">Home: <strong>{{ analytics["home_kingdom"] or "unknown" }}</strong> | Scope: <strong>{{ analytics["selected_war_label"] }}</strong> | Focus: <strong>{{ snapshot["focus_label"] }}</strong></p>
       </div>
       <div class="statusline" id="ingestStatus">
-        <div>
-          Ingest: <strong id="statusEnabled">{{ "enabled" if ingest["enabled"] else "disabled" }}</strong>
-          | State: <strong id="statusRunning">{{ "running" if ingest["running"] else "idle" }}</strong>
-        </div>
-        <div>
-          Last success: <strong id="statusLastSuccess">{{ ingest["last_success_utc"] or "n/a" }}</strong>
-          | Last parsed: <strong id="statusLastParsed">{{ ingest["last_parsed_events"] if ingest["last_parsed_events"] is not none else "n/a" }}</strong>
-        </div>
+        <div>Ingest: <strong id="statusEnabled">{{ "enabled" if ingest["enabled"] else "disabled" }}</strong> | State: <strong id="statusRunning">{{ "running" if ingest["running"] else "idle" }}</strong></div>
+        <div>Last success: <strong id="statusLastSuccess">{{ ingest["last_success_utc"] or "n/a" }}</strong> | Last parsed: <strong id="statusLastParsed">{{ ingest["last_parsed_events"] if ingest["last_parsed_events"] is not none else "n/a" }}</strong></div>
         <div>Last error: <strong id="statusLastError">{{ ingest["last_error"] or "none" }}</strong></div>
-        <div>Auto refresh: <strong>on</strong></div>
       </div>
     </section>
 
-    <section class="kpis">
-      <div class="kpi" data-fact="total_events">
-        <div class="label">Total Events</div>
-        <div class="value">{{ analytics["kpis"]["total_events"] }}</div>
-      </div>
-      <div class="kpi" data-fact="attack_success">
-        <div class="label">Attack Success</div>
-        <div class="value">{{ analytics["kpis"]["attack_success_rate"] }}%</div>
-        <div class="sub">{{ analytics["kpis"]["successful_hits"] }} successful / {{ analytics["kpis"]["failed_hits"] }} failed</div>
-      </div>
-      <div class="kpi" data-fact="home_net">
-        <div class="label">Home Acres Gained</div>
-        <div class="value gain">{{ analytics["kpis"]["home_gained"] }}</div>
-      </div>
-      <div class="kpi" data-fact="home_net">
-        <div class="label">Home Acres Lost</div>
-        <div class="value loss">{{ analytics["kpis"]["home_lost"] }}</div>
-      </div>
-      <div class="kpi" data-fact="home_net">
-        <div class="label">Home Net Acres</div>
-        <div class="value {{ 'gain' if analytics['kpis']['home_net'] >= 0 else 'loss' }}">{{ analytics["kpis"]["home_net"] }}</div>
-      </div>
-      <div class="kpi" data-fact="total_events">
-        <div class="label">Tracked Provinces</div>
-        <div class="value">{{ analytics["kpis"]["tracked_provinces"] }}</div>
-        <div class="sub">{{ analytics["kpis"]["tracked_kingdoms"] }} kingdoms</div>
-      </div>
-      <div class="kpi" data-fact="aid_shipments">
-        <div class="label">Aid Shipments</div>
-        <div class="value">{{ analytics["kpis"]["aid_shipments"] }}</div>
-      </div>
-      <div class="kpi" data-fact="total_events">
-        <div class="label">Dragons / Diplomacy</div>
-        <div class="value">{{ analytics["kpis"]["dragons"] }} / {{ analytics["kpis"]["diplomacy"] }}</div>
-      </div>
-      <div class="kpi" data-fact="wars">
-        <div class="label">Wars</div>
-        <div class="value">{{ analytics["kpis"]["active_wars"] }} active / {{ analytics["kpis"]["completed_wars"] }} closed</div>
-        <div class="sub">victories {{ analytics["kpis"]["war_victories"] }} | failures {{ analytics["kpis"]["war_failures"] }}</div>
-      </div>
-    </section>
-
-    <section class="card" style="margin-top: 12px;">
-      <h3>War Results</h3>
-      <p class="hint">Declaration-to-end war tracking with post-war windows and land/hit outcomes versus your inferred home kingdom.</p>
-      <div class="table-wrap">
-        <table class="sortable">
-          <tr>
-            <th>Opponent</th>
-            <th>Opp KD</th>
-            <th>Start</th>
-            <th>End</th>
-            <th>Result</th>
-            <th>Hits For</th>
-            <th>Hits Against</th>
-            <th>Acres For</th>
-            <th>Acres Against</th>
-            <th>Net</th>
-            <th>Post-War Expires</th>
-            <th>Post-War Ended</th>
-          </tr>
-          {% for row in analytics["war_rows"] %}
-            <tr class="fact-row" data-fact="war" data-key="{{ row['war_id'] }}">
-              <td>{{ row["opponent_name"] }}</td>
-              <td>{{ row["opponent_kingdom"] or "-" }}</td>
-              <td>{{ row["start_day"] or "-" }}</td>
-              <td>{{ row["end_day"] }}</td>
-              <td><span class="pill {{ row['result'] }}">{{ row["result"] }}</span></td>
-              <td>{{ row["hits_for"] }}</td>
-              <td>{{ row["hits_against"] }}</td>
-              <td>{{ row["acres_for"] }}</td>
-              <td>{{ row["acres_against"] }}</td>
-              <td class="{{ 'net-pos' if row['net_acres'] >= 0 else 'net-neg' }}">{{ row["net_acres"] }}</td>
-              <td>{{ row["postwar_expires"] }}</td>
-              <td>{{ row["postwar_end_day"] }}</td>
-            </tr>
-          {% endfor %}
-          {% if not analytics["war_rows"] %}
-            <tr>
-              <td colspan="12">No war declarations/endings parsed yet.</td>
-            </tr>
-          {% endif %}
-        </table>
-      </div>
-    </section>
-
-    <section class="grid-2">
-      <article class="card">
-        <h3>Friendly Province Ledger</h3>
-        <p class="hint">Top friendly provinces by net acres (gains - losses).</p>
-        <div class="table-wrap">
-          <table class="sortable">
-            <tr>
-              <th>Province</th>
-              <th>KD</th>
-              <th>Gains</th>
-              <th>Losses</th>
-              <th>Net</th>
-              <th>Sent</th>
-              <th>Recv</th>
-              <th>Success %</th>
-            </tr>
-            {% for row in analytics["friendly_leaderboard"] %}
-              <tr>
-                <td>
-                  <button
-                    type="button"
-                    class="inline-link province-link"
-                    data-province="{{ row['name'] }}"
-                    data-kingdom="{{ row['kingdom'] or '' }}"
-                  >{{ row["name"] }}</button>
-                </td>
-                <td>{{ row["kingdom"] or "-" }}</td>
-                <td>{{ row["gains"] }}</td>
-                <td>{{ row["losses"] }}</td>
-                <td class="{{ 'net-pos' if row['net'] >= 0 else 'net-neg' }}">{{ row["net"] }}</td>
-                <td>{{ row["attacks_sent"] }}</td>
-                <td>{{ row["attacks_received"] }}</td>
-                <td>{{ row["success_rate"] }}%</td>
-              </tr>
-            {% endfor %}
-          </table>
+    <form id="filterForm" class="control" method="GET" action="/">
+      <div class="control-grid">
+        <label class="field">War<select id="warSelect" name="war"><option value="all" {% if analytics["selected_war_id"] == "all" %}selected{% endif %}>All events</option>{% for row in analytics["war_rows"] %}<option value="{{ row['war_id'] }}" {% if analytics["selected_war_id"] == row["war_id"] %}selected{% endif %}>{{ row["war_label"] }}</option>{% endfor %}</select></label>
+        <label class="field">Start (UTC)<input id="startDay" name="start" type="date" value="{{ analytics['selected_start_day'] }}" /></label>
+        <label class="field">End (UTC)<input id="endDay" name="end" type="date" value="{{ analytics['selected_end_day'] }}" /></label>
+        <label class="field">Kingdom<select id="kingdomSelect" name="kingdom"><option value="">Auto</option>{% for row in snapshot["kingdom_choices"] %}<option value="{{ row['coord'] }}" {% if snapshot["focus_kingdom"] == row["coord"] %}selected{% endif %}>{{ row["label"] }}</option>{% endfor %}</select></label>
+        <label class="field">Compare<select id="compareSelect" name="compare"><option value="">Auto</option>{% for row in snapshot["kingdom_choices"] %}{% set selected_compare = snapshot["compare"]["right"]["coord"] if snapshot["compare"] else "" %}<option value="{{ row['coord'] }}" {% if selected_compare == row["coord"] %}selected{% endif %}>{{ row["label"] }}</option>{% endfor %}</select></label>
+        <label class="field">Search<input id="globalSearch" type="search" placeholder="province or kingdom..." /></label>
+        <div class="actions">
+          <button class="btn" type="submit">Apply</button>
+          <button class="btn" type="button" id="resetFilters">Reset</button>
+          <a class="btn" href="{{ ops_summary_href }}">Ops Summary</a>
+          <input type="hidden" name="view" id="viewModeInput" value="{{ analytics['selected_view'] }}" />
         </div>
-      </article>
+      </div>
+      <div class="tabs">
+        <button class="tab" type="button" data-view="overview">Overview</button>
+        <button class="tab" type="button" data-view="war">War</button>
+        <button class="tab" type="button" data-view="kingdom">Kingdom</button>
+        <button class="tab" type="button" data-view="targets">Targets</button>
+      </div>
+    </form>
 
-      <article class="card">
-        <h3>Opponent Kingdom Pressure</h3>
-        <p class="hint">How each opponent kingdom traded land and hits versus home kingdom {{ analytics["home_kingdom"] or "?" }}.</p>
-        <div class="table-wrap">
-          <table class="sortable">
-            <tr>
-              <th>Opponent KD</th>
-              <th>Hits For</th>
-              <th>Hits Against</th>
-              <th>Acres For</th>
-              <th>Acres Against</th>
-              <th>Net</th>
-            </tr>
-            {% for row in analytics["opponent_rows"] %}
-              <tr class="fact-row" data-fact="opponent" data-key="{{ row['kingdom'] }}">
-                <td>{{ row["kingdom"] }}</td>
-                <td>{{ row["hits_for"] }}</td>
-                <td>{{ row["hits_against"] }}</td>
-                <td>{{ row["acres_for"] }}</td>
-                <td>{{ row["acres_against"] }}</td>
-                <td class="{{ 'net-pos' if row['net'] >= 0 else 'net-neg' }}">{{ row["net"] }}</td>
-              </tr>
-            {% endfor %}
-          </table>
-        </div>
-      </article>
-    </section>
+    {% if snapshot["alerts"] %}
+      <section class="alerts">{% for alert in snapshot["alerts"] %}<div class="alert">{{ alert }}</div>{% endfor %}</section>
+    {% endif %}
 
-    <section class="grid-2">
+    <section class="charts-main" data-view-block="war" id="warCenterCharts">
       <article class="card">
-        <h3>Most Active Provinces</h3>
-        <p class="hint">Activity = attacks sent + attacks received + aid sent + aid received.</p>
-        <div class="table-wrap">
-          <table class="sortable">
-            <tr>
-              <th>Province</th>
-              <th>KD</th>
-              <th>Activity</th>
-              <th>Sent</th>
-              <th>Recv</th>
-              <th>Aid Out</th>
-              <th>Aid In</th>
-            </tr>
-            {% for row in analytics["active_rows"] %}
-              <tr>
-                <td>
-                  <button
-                    type="button"
-                    class="inline-link province-link"
-                    data-province="{{ row['name'] }}"
-                    data-kingdom="{{ row['kingdom'] or '' }}"
-                  >{{ row["name"] }}</button>
-                </td>
-                <td>{{ row["kingdom"] or "-" }}</td>
-                <td>{{ row["activity"] }}</td>
-                <td>{{ row["attacks_sent"] }}</td>
-                <td>{{ row["attacks_received"] }}</td>
-                <td>{{ row["aid_sent"] }}</td>
-                <td>{{ row["aid_received"] }}</td>
-              </tr>
-            {% endfor %}
-          </table>
-        </div>
-      </article>
-
-      <article class="card">
-        <h3>Most Targeted Provinces</h3>
-        <p class="hint">Provinces absorbing the highest incoming pressure.</p>
-        <div class="table-wrap">
-          <table class="sortable">
-            <tr>
-              <th>Province</th>
-              <th>KD</th>
-              <th>Hits Received</th>
-              <th>Losses</th>
-              <th>Net</th>
-            </tr>
-            {% for row in analytics["target_rows"] %}
-              <tr>
-                <td>
-                  <button
-                    type="button"
-                    class="inline-link province-link"
-                    data-province="{{ row['name'] }}"
-                    data-kingdom="{{ row['kingdom'] or '' }}"
-                  >{{ row["name"] }}</button>
-                </td>
-                <td>{{ row["kingdom"] or "-" }}</td>
-                <td>{{ row["attacks_received"] }}</td>
-                <td>{{ row["losses"] }}</td>
-                <td class="{{ 'net-pos' if row['net'] >= 0 else 'net-neg' }}">{{ row["net"] }}</td>
-              </tr>
-            {% endfor %}
-          </table>
-        </div>
-      </article>
-    </section>
-
-    <section class="charts">
-      <article class="card">
-        <h3>Event Momentum by Utopia Day</h3>
-        <p class="hint">Stacked event volumes for attack, aid, dragon, diplomacy, and more.</p>
-        <div class="chart-box">
-          <canvas id="momentumChart"></canvas>
-        </div>
+        <h3>War Momentum</h3>
+        <p class="hint">Stacked event volume by Utopia day.</p>
+        <div class="chart chart-xl"><canvas id="momentumChart"></canvas></div>
       </article>
       <article class="card">
-        <h3>Home Land Swing</h3>
+        <h3>War Land Swing</h3>
         <p id="landSwingMeta" class="hint">Gained vs lost acres for inferred home kingdom {{ analytics["home_kingdom"] or "unknown" }}.</p>
-        <div class="chart-box">
-          <canvas id="landSwingChart"></canvas>
+        <div class="chart chart-xl"><canvas id="landSwingChart"></canvas></div>
+      </article>
+      <article class="card">
+        <h3>Networth Swing</h3>
+        <p id="nwSwingMeta" class="hint">Daily networth change from kingdom snapshot trend.</p>
+        <div class="chart chart-xl"><canvas id="nwSwingChart"></canvas></div>
+      </article>
+    </section>
+
+    <section class="kpis" data-view-block="overview kingdom war">
+      <div class="kpi" data-fact="total_events"><div class="label">Total Events</div><div class="value">{{ analytics["kpis"]["total_events"] }}</div></div>
+      <div class="kpi" data-fact="attack_success"><div class="label">Attack Success</div><div class="value">{{ analytics["kpis"]["attack_success_rate"] }}%</div><div class="sub">{{ analytics["kpis"]["successful_hits"] }} / {{ analytics["kpis"]["failed_hits"] }}</div></div>
+      <div class="kpi" data-fact="home_net"><div class="label">Home Gained</div><div class="value gain">{{ analytics["kpis"]["home_gained"] }}</div></div>
+      <div class="kpi" data-fact="home_net"><div class="label">Home Lost</div><div class="value loss">{{ analytics["kpis"]["home_lost"] }}</div></div>
+      <div class="kpi" data-fact="home_net"><div class="label">Home Net</div><div class="value {{ 'gain' if analytics['kpis']['home_net'] >= 0 else 'loss' }}">{{ analytics["kpis"]["home_net"] }}</div></div>
+      <div class="kpi" data-fact="total_events"><div class="label">Tracked Provinces</div><div class="value">{{ analytics["kpis"]["tracked_provinces"] }}</div><div class="sub">{{ analytics["kpis"]["tracked_kingdoms"] }} kingdoms</div></div>
+      <div class="kpi" data-fact="aid_shipments"><div class="label">Aid</div><div class="value">{{ analytics["kpis"]["aid_shipments"] }}</div></div>
+      <div class="kpi" data-fact="wars"><div class="label">Wars</div><div class="value">{{ analytics["kpis"]["active_wars"] }} / {{ analytics["kpis"]["completed_wars"] }}</div><div class="sub">victories {{ analytics["kpis"]["war_victories"] }} | failures {{ analytics["kpis"]["war_failures"] }}</div></div>
+      <div class="kpi"><div class="label">Op Damage Done</div><div class="value gain">{{ analytics["kpis"]["op_damage_done"] }}</div><div class="sub">war {{ analytics["kpis"]["war_op_damage_done"] }}</div></div>
+      <div class="kpi"><div class="label">Op Damage Taken</div><div class="value loss">{{ analytics["kpis"]["op_damage_taken"] }}</div><div class="sub">war {{ analytics["kpis"]["war_op_damage_taken"] }}</div></div>
+      <div class="kpi"><div class="label">Op Net Damage</div><div class="value {{ 'gain' if analytics['kpis']['op_net_damage'] >= 0 else 'loss' }}">{{ analytics["kpis"]["op_net_damage"] }}</div><div class="sub">see Ops Summary</div></div>
+      {% if snapshot["focus_roster"] %}<div class="kpi" data-fact="total_events"><div class="label">Roster</div><div class="value">{{ snapshot["focus_roster"]["active_provinces"] }} / 25</div><div class="sub">online {{ snapshot["focus_roster"]["online"] }} empty {{ snapshot["focus_roster"]["empty_slots"] }}</div></div>{% endif %}
+    </section>
+
+    <section class="grid-2" data-view-block="war overview">
+      <article class="card">
+        <h3>War Replay</h3>
+        <p class="hint">Slide through war days to inspect cumulative land and op damage swing.</p>
+        <div class="replay-panel">
+          <div class="replay-range">
+            <input id="replaySlider" type="range" min="0" max="{{ (war_command['replay_rows']|length - 1) if war_command['replay_rows'] else 0 }}" value="{{ (war_command['replay_rows']|length - 1) if war_command['replay_rows'] else 0 }}" />
+          </div>
+          <p id="replayDayLabel" class="hint">{% if war_command["replay_rows"] %}{{ war_command["replay_rows"][-1]["day"] }}{% else %}No replay rows in current scope.{% endif %}</p>
+          <div class="replay-metrics">
+            <div class="cell">Home Land Net<strong id="replayLandNet">0</strong></div>
+            <div class="cell">Cumulative Land<strong id="replayLandCum">0</strong></div>
+            <div class="cell">Op Net Damage<strong id="replayOpNet">0</strong></div>
+            <div class="cell">Cumulative Op Net<strong id="replayOpCum">0</strong></div>
+          </div>
+        </div>
+      </article>
+      <article class="card">
+        <h3>Chain Pressure</h3>
+        <p class="hint">Multi-hit pressure spikes (3+ hits in same day against same target).</p>
+        <div class="table-wrap">
+          <table class="sortable">
+            <tr><th>Day</th><th>Side</th><th>Target</th><th>KD</th><th>Hits</th><th>Land</th><th>Unique</th><th>Attackers</th></tr>
+            {% for row in war_command["chain_alerts"] %}
+            <tr>
+              <td>{{ row["day"] }}</td>
+              <td><span class="pill {{ 'active' if row['side'] == 'outgoing' else 'failed' }}">{{ row["side"] }}</span></td>
+              <td><button class="inline-link province-link" type="button" data-province="{{ row['target'] }}" data-kingdom="{{ row['target_kingdom'] if row['target_kingdom'] != '-' else '' }}">{{ row["target"] }}</button></td>
+              <td>{{ row["target_kingdom"] }}</td>
+              <td>{{ row["hits"] }}</td>
+              <td>{{ row["land"] }}</td>
+              <td>{{ row["unique_attackers"] }}</td>
+              <td class="summary">{{ row["attackers"] }}</td>
+            </tr>
+            {% endfor %}
+          </table>
         </div>
       </article>
     </section>
 
-    <section class="card" style="margin-top: 12px;">
-      <h3>Latest Event Feed</h3>
-      <p class="hint">Most recent 80 parsed events with derived outcome and acre deltas.</p>
+    <section class="grid-2" data-view-block="war overview">
+      <article class="card">
+        <h3>Top Home Attackers (War Context)</h3>
+        <p class="hint">Land delivered by home provinces while in active wars.</p>
+        <div class="table-wrap">
+          <table class="sortable">
+            <tr><th>Province</th><th>KD</th><th>Hits</th><th>Land</th><th>Avg</th></tr>
+            {% for row in war_command["home_attackers"] %}
+            <tr>
+              <td><button class="inline-link province-link" type="button" data-province="{{ row['province'] }}" data-kingdom="{{ row['kingdom'] if row['kingdom'] != '-' else '' }}">{{ row["province"] }}</button></td>
+              <td>{{ row["kingdom"] }}</td><td>{{ row["hits"] }}</td><td>{{ row["land"] }}</td><td>{{ row["avg_land"] }}</td>
+            </tr>
+            {% endfor %}
+          </table>
+        </div>
+      </article>
+      <article class="card">
+        <h3>Enemy Attackers vs Home (War Context)</h3>
+        <p class="hint">Incoming land pressure by enemy provinces during wars.</p>
+        <div class="table-wrap">
+          <table class="sortable">
+            <tr><th>Province</th><th>KD</th><th>Hits</th><th>Land</th><th>Avg</th></tr>
+            {% for row in war_command["enemy_attackers"] %}
+            <tr>
+              <td><button class="inline-link province-link" type="button" data-province="{{ row['province'] }}" data-kingdom="{{ row['kingdom'] if row['kingdom'] != '-' else '' }}">{{ row["province"] }}</button></td>
+              <td>{{ row["kingdom"] }}</td><td>{{ row["hits"] }}</td><td>{{ row["land"] }}</td><td>{{ row["avg_land"] }}</td>
+            </tr>
+            {% endfor %}
+          </table>
+        </div>
+      </article>
+    </section>
+
+    <section class="card" data-view-block="war overview">
+      <h3>Op Duration Uptime (War Context)</h3>
+      <p class="hint">Tick-duration effects seen during war windows, split home casts vs incoming casts.</p>
       <div class="table-wrap">
         <table class="sortable">
+          <tr><th>Op</th><th>Kind</th><th>Home Casts</th><th>Vs Home</th><th>Duration Home</th><th>Duration Vs Home</th><th>Avg Home</th><th>Avg Vs Home</th></tr>
+          {% for row in war_command["uptime_rows"] %}
           <tr>
-            <th>Fetched</th>
-            <th>Event Day</th>
-            <th>Category</th>
-            <th>Outcome</th>
-            <th>Acres</th>
-            <th>Actor</th>
-            <th>Target</th>
-            <th>Summary</th>
+            <td>{{ row["op_name"] }}</td>
+            <td><span class="pill {{ row['op_kind'] }}">{{ row["op_kind"] }}</span></td>
+            <td>{{ row["casts_home"] }}</td>
+            <td>{{ row["casts_vs_home"] }}</td>
+            <td>{{ row["duration_home"] }}</td>
+            <td>{{ row["duration_vs_home"] }}</td>
+            <td>{{ row["avg_duration_home"] }}</td>
+            <td>{{ row["avg_duration_vs_home"] }}</td>
           </tr>
-          {% for row in latest %}
-            <tr
-              class="event-row"
-              data-event-id="{{ row['event_id'] }}"
-              data-fetched="{{ row['fetched_at_utc'] }}"
-              data-day="{{ row['event_time_text'] or '-' }}"
-              data-category="{{ row['category'] }}"
-              data-outcome="{{ row['outcome'] or '-' }}"
-              data-acres="{{ row['acres'] if row['acres'] is not none else '-' }}"
-              data-actor="{{ row['actor'] }}"
-              data-actor-kingdom="{{ row['actor_kingdom'] or '' }}"
-              data-target="{{ row['target'] }}"
-              data-target-kingdom="{{ row['target_kingdom'] or '' }}"
-              data-summary="{{ row['summary']|e }}"
-            >
-              <td>{{ row["fetched_at_utc"] }}</td>
-              <td>{{ row["event_time_text"] or "-" }}</td>
-              <td>{{ row["category"] }}</td>
-              <td>
-                {% if row["outcome"] %}
-                  <span class="pill {{ row['outcome'] }}">{{ row["outcome"] }}</span>
-                {% else %}
-                  -
-                {% endif %}
-              </td>
-              <td>{{ row["acres"] if row["acres"] is not none else "-" }}</td>
-              <td>
-                {% if row["actor"] != "-" %}
-                  <button
-                    type="button"
-                    class="inline-link province-link"
-                    data-province="{{ row['actor'] }}"
-                    data-kingdom="{{ row['actor_kingdom'] or '' }}"
-                  >{{ row["actor"] }}</button>
-                {% else %}
-                  -
-                {% endif %}
-              </td>
-              <td>
-                {% if row["target"] != "-" %}
-                  <button
-                    type="button"
-                    class="inline-link province-link"
-                    data-province="{{ row['target'] }}"
-                    data-kingdom="{{ row['target_kingdom'] or '' }}"
-                  >{{ row["target"] }}</button>
-                {% else %}
-                  -
-                {% endif %}
-              </td>
-              <td class="summary">{{ row["summary"] }}</td>
-            </tr>
           {% endfor %}
         </table>
       </div>
     </section>
 
-    <section id="eventDetail" class="card" style="margin-top: 12px;">
-      <h3>Event Detail</h3>
-      <p id="eventDetailHint" class="hint">Click any row in Latest Event Feed to inspect details.</p>
-      <div id="eventDetailMeta" class="detail-grid"></div>
-      <p id="eventDetailSummary" class="detail-summary">No event selected.</p>
+    {% if snapshot["available"] %}
+      <section class="snapshot-grid" data-view-block="overview kingdom">
+        <article class="card"><h3>Kingdom Trends</h3><p class="hint">Land, NW, honor timeline for {{ snapshot["focus_label"] }}.</p><div class="chart"><canvas id="kingdomTrendChart"></canvas></div></article>
+        <article class="card"><h3>Snapshot Delta Feed</h3><p class="hint">Latest deltas vs previous snapshot.</p><div class="table-wrap"><table class="sortable"><tr><th>Kingdom</th><th>Stance</th><th>dLand</th><th>dNW</th><th>dHonor</th></tr>{% for row in snapshot["delta_rows"] %}<tr><td>{{ row["name"] }} ({{ row["coord"] }})</td><td>{{ row["stance"] }}</td><td class="{{ 'gain' if row['delta_land'] >= 0 else 'loss' }}">{{ "%+d"|format(row["delta_land"]) }}</td><td class="{{ 'gain' if row['delta_nw'] >= 0 else 'loss' }}">{{ "%+d"|format(row["delta_nw"]) }}</td><td class="{{ 'gain' if row['delta_honor'] >= 0 else 'loss' }}">{{ "%+d"|format(row["delta_honor"]) }}</td></tr>{% endfor %}</table></div></article>
+      </section>
+      <section class="grid-2" data-view-block="kingdom war">
+        <article class="card"><h3>Roster + Doctrine</h3><p class="hint">Race mix and doctrine from latest kingdom details snapshot.</p><div class="table-wrap"><table class="sortable"><tr><th>Race</th><th>Count</th></tr>{% for row in snapshot["race_mix"] %}<tr><td>{{ row["race"] }}</td><td>{{ row["count"] }}</td></tr>{% endfor %}</table></div><div class="table-wrap" style="margin-top:8px"><table class="sortable"><tr><th>Race</th><th>Prov</th><th>Doctrine</th><th>Bonus</th></tr>{% for row in snapshot["focus_doctrines"] %}<tr><td>{{ row["race"] }}</td><td>{{ row["provinces"] }}</td><td>{{ row["doctrine_effect"] }}</td><td>{{ row["current_bonus"] }}</td></tr>{% endfor %}</table></div></article>
+        <article class="card"><h3>War Compare</h3><p class="hint">Side-by-side kingdom snapshot compare.</p>{% if snapshot["compare"] %}<div class="table-wrap"><table><tr><th>Metric</th><th>{{ snapshot["compare"]["left"]["coord"] }}</th><th>{{ snapshot["compare"]["right"]["coord"] }}</th></tr><tr><td>Land</td><td>{{ snapshot["compare"]["left"]["land"] }}</td><td>{{ snapshot["compare"]["right"]["land"] }}</td></tr><tr><td>Networth</td><td>{{ snapshot["compare"]["left"]["networth"] }}</td><td>{{ snapshot["compare"]["right"]["networth"] }}</td></tr><tr><td>Honor</td><td>{{ snapshot["compare"]["left"]["honor"] }}</td><td>{{ snapshot["compare"]["right"]["honor"] }}</td></tr></table></div><div class="chart" style="margin-top:8px"><canvas id="kingdomCompareChart"></canvas></div>{% else %}<p class="hint">No compare target available yet.</p>{% endif %}</article>
+      </section>
+      <section class="card" data-view-block="targets kingdom"><h3>Targeting Board</h3><p class="hint">Priority targets by NW/A, pressure, losses, and activity.</p><div class="table-wrap"><table class="sortable"><tr><th>KD</th><th>Province</th><th>Race</th><th>Land</th><th>NW/A</th><th>Incoming</th><th>Losses</th><th>Activity</th><th>Score</th></tr>{% for row in snapshot["target_board_rows"] %}<tr><td>{{ row["kingdom"] }}</td><td><button class="inline-link province-link" type="button" data-province="{{ row['province'] }}" data-kingdom="{{ row['kingdom'] }}">{{ row["province"] }}</button></td><td>{{ row["race"] }}</td><td>{{ row["land"] }}</td><td>{{ row["nwpa"] }}</td><td>{{ row["incoming_hits"] }}</td><td>{{ row["losses"] }}</td><td>{{ row["activity"] }}</td><td>{{ row["score"] }}</td></tr>{% endfor %}</table></div></section>
+    {% endif %}
+
+    <section class="card" data-view-block="war overview"><h3>War Results</h3><p class="hint">Declaration-to-end war tracking with post-war windows and outcomes.</p><div class="table-wrap"><table class="sortable"><tr><th>Opponent</th><th>Opp KD</th><th>Start</th><th>End</th><th>Result</th><th>Hits For</th><th>Hits Against</th><th>Acres For</th><th>Acres Against</th><th>Net</th><th>Post-War Expires</th><th>Post-War Ended</th></tr>{% for row in analytics["war_rows"] %}<tr class="fact-row" data-fact="war" data-key="{{ row['war_id'] }}"><td>{{ row["opponent_name"] }}</td><td>{{ row["opponent_kingdom"] or "-" }}</td><td>{{ row["start_day"] or "-" }}</td><td>{{ row["end_day"] }}</td><td><span class="pill {{ row['result'] }}">{{ row["result"] }}</span></td><td>{{ row["hits_for"] }}</td><td>{{ row["hits_against"] }}</td><td>{{ row["acres_for"] }}</td><td>{{ row["acres_against"] }}</td><td class="{{ 'gain' if row['net_acres'] >= 0 else 'loss' }}">{{ row["net_acres"] }}</td><td>{{ row["postwar_expires"] }}</td><td>{{ row["postwar_end_day"] }}</td></tr>{% endfor %}</table></div></section>
+
+    <section class="grid-2" data-view-block="overview war">
+      <article class="card"><h3>Friendly Province Ledger</h3><p class="hint">Top friendly provinces by net acres.</p><div class="table-wrap"><table class="sortable"><tr><th>Province</th><th>KD</th><th>Gains</th><th>Losses</th><th>Net</th><th>Sent</th><th>Recv</th><th>Success %</th></tr>{% for row in analytics["friendly_leaderboard"] %}<tr><td><button class="inline-link province-link" type="button" data-province="{{ row['name'] }}" data-kingdom="{{ row['kingdom'] or '' }}">{{ row["name"] }}</button></td><td>{{ row["kingdom"] or "-" }}</td><td>{{ row["gains"] }}</td><td>{{ row["losses"] }}</td><td class="{{ 'gain' if row['net'] >= 0 else 'loss' }}">{{ row["net"] }}</td><td>{{ row["attacks_sent"] }}</td><td>{{ row["attacks_received"] }}</td><td>{{ row["success_rate"] }}%</td></tr>{% endfor %}</table></div></article>
+      <article class="card"><h3>Opponent Kingdom Pressure</h3><p class="hint">Land and hit trade versus home kingdom.</p><div class="table-wrap"><table class="sortable"><tr><th>Opponent KD</th><th>Hits For</th><th>Hits Against</th><th>Acres For</th><th>Acres Against</th><th>Net</th></tr>{% for row in analytics["opponent_rows"] %}<tr class="fact-row" data-fact="opponent" data-key="{{ row['kingdom'] }}"><td>{{ row["kingdom"] }}</td><td>{{ row["hits_for"] }}</td><td>{{ row["hits_against"] }}</td><td>{{ row["acres_for"] }}</td><td>{{ row["acres_against"] }}</td><td class="{{ 'gain' if row['net'] >= 0 else 'loss' }}">{{ row["net"] }}</td></tr>{% endfor %}</table></div></article>
     </section>
 
-    <section id="provinceHistory" class="card" style="margin-top: 12px;">
-      <h3 id="provinceHistoryTitle">Province History</h3>
-      <p id="provinceHistoryHint" class="hint">Click a province name anywhere in the tables to load its timeline.</p>
-      <div id="provinceHistoryMeta" class="fact-rows"></div>
-      <div class="table-wrap" style="margin-top: 8px;">
-        <table id="provinceHistoryTable" class="sortable">
-          <tr>
-            <th>Fetched</th>
-            <th>Day</th>
-            <th>Category</th>
-            <th>Role</th>
-            <th>Outcome</th>
-            <th>Acres</th>
-            <th>Actor</th>
-            <th>Target</th>
-            <th>Summary</th>
-          </tr>
-        </table>
+    <section class="inspector" data-view-block="overview war kingdom targets">
+      <div>
+        <section class="card"><h3>Latest Event Feed</h3><p class="hint">Most recent parsed events with outcome and acre deltas.</p><div class="table-wrap"><table class="sortable"><tr><th>Fetched</th><th>Event Day</th><th>Category</th><th>Attack Type</th><th>Outcome</th><th>Acres</th><th>Actor</th><th>Target</th><th>Summary</th></tr>{% for row in latest %}<tr class="event-row" data-event-id="{{ row['event_id'] }}" data-fetched="{{ row['fetched_at_utc'] }}" data-day="{{ row['event_time_text'] or '-' }}" data-category="{{ row['category'] }}" data-attack-type="{{ row['attack_type'] }}" data-outcome="{{ row['outcome'] or '-' }}" data-acres="{{ row['acres'] if row['acres'] is not none else '-' }}" data-actor="{{ row['actor'] }}" data-actor-kingdom="{{ row['actor_kingdom'] or '' }}" data-target="{{ row['target'] }}" data-target-kingdom="{{ row['target_kingdom'] or '' }}" data-summary="{{ row['summary']|e }}"><td>{{ row["fetched_at_utc"] }}</td><td>{{ row["event_time_text"] or "-" }}</td><td>{{ row["category"] }}</td><td>{{ row["attack_type"] if row["category"] == "attack" else "-" }}</td><td>{% if row["outcome"] %}<span class="pill {{ row['outcome'] }}">{{ row["outcome"] }}</span>{% else %}-{% endif %}</td><td>{{ row["acres"] if row["acres"] is not none else "-" }}</td><td>{% if row["actor"] != "-" %}<button class="inline-link province-link" type="button" data-province="{{ row['actor'] }}" data-kingdom="{{ row['actor_kingdom'] or '' }}">{{ row["actor"] }}</button>{% else %}-{% endif %}</td><td>{% if row["target"] != "-" %}<button class="inline-link province-link" type="button" data-province="{{ row['target'] }}" data-kingdom="{{ row['target_kingdom'] or '' }}">{{ row["target"] }}</button>{% else %}-{% endif %}</td><td class="summary">{{ row["summary"] }}</td></tr>{% endfor %}</table></div></section>
+      </div>
+      <div class="side">
+        <section id="eventDetail" class="card"><h3>Event Detail</h3><p id="eventDetailHint" class="hint">Click any row in Latest Event Feed to inspect details.</p><div id="eventDetailMeta" class="detail-grid"></div><p id="eventDetailSummary" class="detail-summary">No event selected.</p></section>
+        <section class="card"><h3>Province Drill-Down</h3><p class="hint">Click any province name to open the dedicated province detail page with op damage totals, war-time splits, and operation breakdown.</p></section>
+        <section id="factDetail" class="card"><h3 id="factDetailTitle">Fact Detail</h3><p id="factDetailHint" class="hint">Click KPI cards, war rows, or opponent rows to inspect supporting detail.</p><p id="factDetailSummary" class="detail-summary">No fact selected.</p><div id="factDetailRows" class="fact-rows"></div><div id="factDetailEvents" class="fact-events"></div></section>
       </div>
     </section>
 
-    <section id="factDetail" class="card" style="margin-top: 12px;">
-      <h3 id="factDetailTitle">Fact Detail</h3>
-      <p id="factDetailHint" class="hint">Click KPI cards, war rows, or opponent rows to inspect supporting detail.</p>
-      <p id="factDetailSummary" class="detail-summary">No fact selected.</p>
-      <div id="factDetailRows" class="fact-rows"></div>
-      <div id="factDetailEvents" class="fact-events"></div>
-    </section>
-
-    <p class="footer-note">
-      Category totals:
-      {% for row in analytics["category_totals"] %}
-        <span>{{ row["category"] }}={{ row["cnt"] }}{% if not loop.last %} | {% endif %}</span>
-      {% endfor %}
-    </p>
+    <p class="hint">Category totals:{% for row in analytics["category_totals"] %} {{ row["category"] }}={{ row["cnt"] }}{% if not loop.last %} |{% endif %}{% endfor %}</p>
   </div>
-
+  <div id="toastStack"></div>
+  <script>
+    window.__snapshot = {{ snapshot | tojson }};
+    window.__warCommand = {{ war_command | tojson }};
+  </script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="/static/app.js"></script>
 </body>

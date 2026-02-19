@@ -1,0 +1,223 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ops Summary</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg-top:#112033;--bg-bottom:#060b14;--panel:rgba(16,35,60,.82);--panel-soft:rgba(22,45,74,.76);--border:rgba(168,199,255,.25);--text:#e9f1ff;--muted:#9ab1ce;--accent:#53b1ff;--gain:#33c77f;--loss:#ff7474;--warn:#ffc857}
+    *{box-sizing:border-box}
+    body{margin:0;color:var(--text);background:radial-gradient(1200px 480px at 8% -10%,#2a4771 0%,transparent 60%),radial-gradient(800px 400px at 95% 0%,#294163 0%,transparent 58%),linear-gradient(180deg,var(--bg-top),var(--bg-bottom));font-family:"Space Grotesk","Segoe UI",sans-serif;min-height:100vh;overflow-x:hidden}
+    .wrap{width:min(1500px,100%);margin:0 auto;padding:16px 12px 26px}
+    .hero{display:flex;justify-content:space-between;gap:10px;align-items:flex-end;flex-wrap:wrap}
+    h1{margin:0;font-size:30px}
+    .subtitle{margin:6px 0 0;color:var(--muted);font-size:13px}
+    .statusline{font-size:12px;color:var(--muted);text-align:right;line-height:1.6}.statusline strong{color:var(--text)}
+    .row{display:flex;gap:8px;flex-wrap:wrap}
+    .btn{display:inline-block;padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:rgba(27,58,95,.88);color:var(--text);font-size:12px;text-decoration:none}
+    .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:9px;margin-top:10px}
+    .kpi{padding:10px;border:1px solid var(--border);border-radius:12px;background:linear-gradient(180deg,rgba(84,129,191,.18),rgba(15,36,62,.92))}
+    .kpi .label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+    .kpi .value{margin-top:4px;font-size:22px;font-weight:700}
+    .kpi .sub{font-size:11px;color:var(--muted)}
+    .gain{color:var(--gain)}.loss{color:var(--loss)}
+    .card{margin-top:10px;padding:11px;border:1px solid var(--border);border-radius:12px;background:var(--panel);box-shadow:0 8px 22px rgba(2,7,16,.2);backdrop-filter:blur(6px)}
+    .card h3{margin:0 0 8px;font-size:16px}
+    .hint{margin:0 0 8px;color:var(--muted);font-size:12px}
+    .grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .table-wrap{max-width:100%;overflow-x:auto;overflow-y:hidden}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    th,td{padding:6px 7px;border-bottom:1px solid rgba(159,186,223,.18);white-space:nowrap;text-align:left}
+    th{font-size:11px;color:#c5dcff;text-transform:uppercase;letter-spacing:.6px;cursor:pointer}
+    th.sorted-asc::after{content:" ^";color:var(--accent)}th.sorted-desc::after{content:" v";color:var(--accent)}
+    td.summary{white-space:normal;min-width:260px;max-width:540px;overflow-wrap:anywhere}
+    .pill{display:inline-block;padding:2px 7px;border-radius:999px;font-size:11px;text-transform:uppercase;border:1px solid rgba(180,205,238,.28)}
+    .pill.hostile{color:#ffd7d7;border-color:rgba(255,116,116,.55);background:rgba(118,47,47,.35)}
+    .pill.intel{color:#d3ecff;border-color:rgba(83,177,255,.55);background:rgba(39,81,124,.38)}
+    .pill.support{color:#cbffdf;border-color:rgba(80,204,128,.5);background:rgba(38,112,68,.38)}
+    .pill.success{color:#cbffdf;border-color:rgba(80,204,128,.5);background:rgba(38,112,68,.38)}
+    .pill.failed{color:#ffd7d7;border-color:rgba(255,116,116,.55);background:rgba(118,47,47,.35)}
+    .pill.partial{color:#ffeec2;border-color:rgba(255,200,87,.55);background:rgba(124,100,38,.35)}
+    .pill.true{color:#ffeec2;border-color:rgba(255,200,87,.55);background:rgba(124,100,38,.35)}
+    .pill.false{color:#dde8f9;border-color:rgba(173,193,225,.45);background:rgba(72,87,109,.4)}
+    .inline-link{background:transparent;border:0;color:var(--accent);text-decoration:underline;text-decoration-style:dotted;cursor:pointer;padding:0;font:inherit}
+    .chart{height:300px;position:relative;padding:7px;border:1px solid var(--border);border-radius:10px;background:var(--panel-soft)}
+    .chart canvas{width:100%!important;height:100%!important}
+    @media (max-width:980px){.grid-2{grid-template-columns:1fr}.statusline{text-align:left}h1{font-size:24px}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <div>
+        <h1>Ops Summary</h1>
+        <p class="subtitle">
+          Home: <strong>{{ home_kingdom or "unknown" }}</strong>
+          | Scope: <strong>{{ selected_war_label }}</strong>
+          {% if selected_start_day or selected_end_day %}| UTC: <strong>{{ selected_start_day or "..." }} -> {{ selected_end_day or "..." }}</strong>{% endif %}
+        </p>
+      </div>
+      <div>
+        <div class="statusline">
+          <div>Ingest: <strong>{{ "enabled" if ingest["enabled"] else "disabled" }}</strong> | State: <strong>{{ "running" if ingest["running"] else "idle" }}</strong></div>
+          <div>Last success: <strong>{{ ingest["last_success_utc"] or "n/a" }}</strong></div>
+        </div>
+        <div class="row" style="margin-top:6px">
+          <a class="btn" href="{{ dashboard_href }}">Back to Dashboard</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="kpis">
+      <div class="kpi"><div class="label">Total Ops</div><div class="value">{{ ops["kpis"]["total_ops"] }}</div><div class="sub">war {{ ops["kpis"]["war_total_ops"] }}</div></div>
+      <div class="kpi"><div class="label">Hostile Ops</div><div class="value">{{ ops["kpis"]["hostile_ops"] }}</div><div class="sub">war {{ ops["kpis"]["war_hostile_ops"] }}</div></div>
+      <div class="kpi"><div class="label">Damage Done</div><div class="value gain">{{ ops["kpis"]["damage_done"] }}</div><div class="sub">war {{ ops["kpis"]["war_damage_done"] }}</div></div>
+      <div class="kpi"><div class="label">Damage Taken</div><div class="value loss">{{ ops["kpis"]["damage_taken"] }}</div><div class="sub">war {{ ops["kpis"]["war_damage_taken"] }}</div></div>
+      <div class="kpi"><div class="label">Net Damage</div><div class="value {{ 'gain' if ops['kpis']['net_damage'] >= 0 else 'loss' }}">{{ ops["kpis"]["net_damage"] }}</div><div class="sub">war {{ ops["kpis"]["war_net_damage"] }}</div></div>
+      <div class="kpi"><div class="label">Gain Done / Taken</div><div class="value">{{ ops["kpis"]["gain_done"] }} / {{ ops["kpis"]["gain_taken"] }}</div><div class="sub">war {{ ops["kpis"]["war_gain_done"] }} / {{ ops["kpis"]["war_gain_taken"] }}</div></div>
+    </section>
+
+    <section class="card">
+      <h3>Damage Over Time</h3>
+      <p class="hint">Hostile op damage from home casts versus incoming hostile ops against home.</p>
+      <div class="chart"><canvas id="opsDamageChart"></canvas></div>
+    </section>
+
+    <section class="card">
+      <h3>Operation Types</h3>
+      <p class="hint">At-a-glance damage by op type with war split and cast direction.</p>
+      <div class="table-wrap">
+        <table class="sortable">
+          <tr>
+            <th>Op</th><th>Kind</th><th>Total</th><th>From Home</th><th>Vs Home</th><th>Home S/P/F/U</th><th>Vs S/P/F/U</th>
+            <th>Damage Done</th><th>Damage Taken</th><th>Net</th><th>War Done</th><th>War Taken</th><th>Gain Done</th><th>Gain Taken</th><th>Duration (home)</th>
+          </tr>
+          {% for row in ops["type_rows"] %}
+          <tr>
+            <td>{{ row["op_name"] }}</td>
+            <td><span class="pill {{ row['op_kind'] }}">{{ row["op_kind"] }}</span></td>
+            <td>{{ row["casts_total"] }}</td>
+            <td>{{ row["casts_home"] }}</td>
+            <td>{{ row["casts_vs_home"] }}</td>
+            <td>{{ row["home_success"] }}/{{ row["home_partial"] }}/{{ row["home_failed"] }}/{{ row["home_unknown"] }}</td>
+            <td>{{ row["vs_home_success"] }}/{{ row["vs_home_partial"] }}/{{ row["vs_home_failed"] }}/{{ row["vs_home_unknown"] }}</td>
+            <td class="gain">{{ row["damage_done"] }}</td>
+            <td class="loss">{{ row["damage_taken"] }}</td>
+            <td class="{{ 'gain' if row['net_damage'] >= 0 else 'loss' }}">{{ row["net_damage"] }}</td>
+            <td class="gain">{{ row["war_damage_done"] }}</td>
+            <td class="loss">{{ row["war_damage_taken"] }}</td>
+            <td class="gain">{{ row["gain_done"] }}</td>
+            <td class="loss">{{ row["gain_taken"] }}</td>
+            <td>{{ row["duration_ticks_home"] }}</td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+    </section>
+
+    <section class="grid-2">
+      <article class="card">
+        <h3>Damage Done By Province</h3>
+        <p class="hint">Home provinces that dealt the most hostile op damage.</p>
+        <div class="table-wrap">
+          <table class="sortable">
+            <tr><th>Province</th><th>KD</th><th>Casts</th><th>Hostile</th><th>Damage Done</th><th>War Damage</th><th>Gain Done</th></tr>
+            {% for row in ops["caster_rows"] %}
+            <tr>
+              <td><button class="inline-link province-link" type="button" data-province="{{ row['province'] }}" data-kingdom="{{ row['kingdom'] if row['kingdom'] != '-' else '' }}">{{ row["province"] }}</button></td>
+              <td>{{ row["kingdom"] }}</td><td>{{ row["casts"] }}</td><td>{{ row["hostile_casts"] }}</td>
+              <td class="gain">{{ row["damage_done"] }}</td><td class="gain">{{ row["war_damage_done"] }}</td><td class="gain">{{ row["gain_done"] }}</td>
+            </tr>
+            {% endfor %}
+          </table>
+        </div>
+      </article>
+      <article class="card">
+        <h3>Targets Hit By Home Ops</h3>
+        <p class="hint">Recipients of home hostile op damage.</p>
+        <div class="table-wrap">
+          <table class="sortable">
+            <tr><th>Province</th><th>KD</th><th>Damage Taken</th><th>War Damage</th><th>Gain Taken</th></tr>
+            {% for row in ops["target_rows"] %}
+            <tr>
+              <td><button class="inline-link province-link" type="button" data-province="{{ row['province'] }}" data-kingdom="{{ row['kingdom'] if row['kingdom'] != '-' else '' }}">{{ row["province"] }}</button></td>
+              <td>{{ row["kingdom"] }}</td>
+              <td class="loss">{{ row["damage_taken"] }}</td><td class="loss">{{ row["war_damage_taken"] }}</td><td class="loss">{{ row["gain_taken"] }}</td>
+            </tr>
+            {% endfor %}
+          </table>
+        </div>
+      </article>
+    </section>
+
+    <section class="grid-2">
+      <article class="card">
+        <h3>Enemy Casters vs Home</h3>
+        <p class="hint">Enemy provinces doing the most hostile op damage against home.</p>
+        <div class="table-wrap">
+          <table class="sortable">
+            <tr><th>Province</th><th>KD</th><th>Casts</th><th>Hostile</th><th>Damage Done</th><th>War Damage</th><th>Gain Done</th></tr>
+            {% for row in ops["enemy_caster_rows"] %}
+            <tr>
+              <td><button class="inline-link province-link" type="button" data-province="{{ row['province'] }}" data-kingdom="{{ row['kingdom'] if row['kingdom'] != '-' else '' }}">{{ row["province"] }}</button></td>
+              <td>{{ row["kingdom"] }}</td><td>{{ row["casts"] }}</td><td>{{ row["hostile_casts"] }}</td>
+              <td class="loss">{{ row["damage_done"] }}</td><td class="loss">{{ row["war_damage_done"] }}</td><td class="loss">{{ row["gain_done"] }}</td>
+            </tr>
+            {% endfor %}
+          </table>
+        </div>
+      </article>
+      <article class="card">
+        <h3>Home Provinces Hit By Enemy Ops</h3>
+        <p class="hint">Home recipients of incoming hostile op damage.</p>
+        <div class="table-wrap">
+          <table class="sortable">
+            <tr><th>Province</th><th>KD</th><th>Damage Taken</th><th>War Damage</th><th>Gain Taken</th></tr>
+            {% for row in ops["home_victim_rows"] %}
+            <tr>
+              <td><button class="inline-link province-link" type="button" data-province="{{ row['province'] }}" data-kingdom="{{ row['kingdom'] if row['kingdom'] != '-' else '' }}">{{ row["province"] }}</button></td>
+              <td>{{ row["kingdom"] }}</td>
+              <td class="loss">{{ row["damage_taken"] }}</td><td class="loss">{{ row["war_damage_taken"] }}</td><td class="loss">{{ row["gain_taken"] }}</td>
+            </tr>
+            {% endfor %}
+          </table>
+        </div>
+      </article>
+    </section>
+
+    <section class="card">
+      <h3>Recent Damaging Ops</h3>
+      <p class="hint">Recent hostile ops with non-zero damage/gain/duration, showing caster and target.</p>
+      <div class="table-wrap">
+        <table class="sortable">
+          <tr>
+            <th>Day</th><th>War</th><th>Op</th><th>Kind</th><th>Outcome</th><th>Damage</th><th>Gain</th><th>Duration</th><th>Actor</th><th>Target</th><th>Summary</th>
+          </tr>
+          {% for row in ops["recent_damage_events"] %}
+          <tr>
+            <td>{{ row["event_time_text"] }}</td>
+            <td><span class="pill {{ row['war_context']|string|lower }}">{{ "war" if row["war_context"] else "no" }}</span></td>
+            <td>{{ row["op_name"] }}</td>
+            <td><span class="pill {{ row['op_kind'] }}">{{ row["op_kind"] }}</span></td>
+            <td><span class="pill {{ row['outcome'] }}">{{ row["outcome"] }}</span></td>
+            <td class="gain">{{ row["damage"] }}</td>
+            <td class="gain">{{ row["gain"] }}</td>
+            <td>{{ row["duration_ticks"] if row["duration_ticks"] else "-" }}</td>
+            <td><button class="inline-link province-link" type="button" data-province="{{ row['actor'] }}" data-kingdom="{{ row['actor_kingdom'] if row['actor_kingdom'] != '-' else '' }}">{{ row["actor"] }}</button></td>
+            <td><button class="inline-link province-link" type="button" data-province="{{ row['target'] }}" data-kingdom="{{ row['target_kingdom'] if row['target_kingdom'] != '-' else '' }}">{{ row["target"] }}</button></td>
+            <td class="summary">{{ row["summary"] }}</td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <script>window.__ops = {{ ops | tojson }};</script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="/static/ops_summary.js"></script>
+</body>
+</html>

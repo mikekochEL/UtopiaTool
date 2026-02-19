@@ -41,6 +41,9 @@ def load_config(path: str = "config.json") -> Dict[str, Any]:
     - UTOPIA_BASE_URL
     - UTOPIA_WORLD
     - UTOPIA_KINGDOM_NEWS_PATH
+    - UTOPIA_ENABLE_KINGDOM_DETAILS
+    - UTOPIA_KINGDOM_DETAILS_PATH
+    - UTOPIA_KD_MAX_PAGES
     - UTOPIA_ENABLE_INTEL_OPS
     - UTOPIA_INTEL_OPS_URL
     - UTOPIA_CRAWL
@@ -71,6 +74,24 @@ def load_config(path: str = "config.json") -> Dict[str, Any]:
     news_crawl = env_truthy(os.getenv("UTOPIA_CRAWL"), default=file_news_crawl)
     news_max_pages = int(os.getenv("UTOPIA_MAX_PAGES", str(file_news_max)))
     poll_seconds = int(os.getenv("UTOPIA_POLL_SECONDS", str(file_cfg.get("poll_seconds", 300))))
+
+    file_kd = file_pages.get("kingdom_details", {})
+    file_kd_path = f"/{world}/game/kingdom_details"
+    file_kd_crawl = True
+    file_kd_max = 20
+    if isinstance(file_kd, str):
+        file_kd_path = file_kd
+    elif isinstance(file_kd, dict) and file_kd:
+        file_kd_path = str(file_kd.get("path", file_kd_path))
+        file_kd_crawl = bool(file_kd.get("crawl", True))
+        file_kd_max = max(1, int(file_kd.get("max_pages", file_kd_max)))
+
+    kd_enabled = env_truthy(
+        os.getenv("UTOPIA_ENABLE_KINGDOM_DETAILS"),
+        default=bool(file_kd) or True,
+    )
+    kd_path = os.getenv("UTOPIA_KINGDOM_DETAILS_PATH", file_kd_path)
+    kd_max_pages = max(1, int(os.getenv("UTOPIA_KD_MAX_PAGES", str(file_kd_max))))
 
     file_intel = file_pages.get("intel_ops", {})
     file_intel_path = ""
@@ -108,6 +129,12 @@ def load_config(path: str = "config.json") -> Dict[str, Any]:
             "max_pages": max(1, news_max_pages),
         }
     }
+    if kd_enabled and kd_path:
+        pages["kingdom_details"] = {
+            "path": kd_path,
+            "crawl": file_kd_crawl,
+            "max_pages": kd_max_pages,
+        }
     if intel_enabled and intel_ops_url:
         pages["intel_ops"] = {
             "path": intel_ops_url,
